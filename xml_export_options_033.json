@@ -1,0 +1,16 @@
+{
+  "project_root": "D:\\STT Projects\\Wedding_Test_001",
+  "roughcut_json": "D:\\STT Projects\\Wedding_Test_001\\exports\\learned_candidates_20260709_155502\\roughcut_learned_candidates.json",
+  "sequence_preset": "vertical_1080_25p",
+  "sequence_label": "Vertical 1080x1920 25p",
+  "sequence_fps": 25,
+  "sequence_width": 1080,
+  "sequence_height": 1920,
+  "xml": "D:\\STT Projects\\Wedding_Test_001\\exports\\learned_candidates_20260709_155502\\stt_ai_premiere_import.xml",
+  "output_dir": "",
+  "raw_result": {
+    "xml": "D:\\STT Projects\\Wedding_Test_001\\exports\\learned_candidates_20260709_155502\\stt_ai_premiere_import.xml",
+    "note": "D:\\STT Projects\\Wedding_Test_001\\exports\\learned_candidates_20260709_155502\\premiere_import_note.txt",
+    "roughcut_json": "D:\\STT Projects\\Wedding_Test_001\\exports\\learned_candidates_20260709_155502\\roughcut_learned_candidates.json"
+  }
+}
