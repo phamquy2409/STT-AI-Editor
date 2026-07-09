@@ -6,6 +6,7 @@ from pathlib import Path
 from core.expansion import expand_candidates_existing_project
 from core.exporter import export_premiere_xml_existing_project
 from core.final_cut import build_final_roughcut_existing_project
+from core.manual_review import generate_manual_review_existing_project
 from core.media import scan_existing_project
 from core.moment import find_best_moments_existing_project
 from core.people_composition import analyze_people_composition_existing_project
@@ -14,6 +15,7 @@ from core.reporting import generate_report_existing_project
 from core.review import generate_preview_review_existing_project
 from core.roughcut import build_roughcut_existing_project
 from core.shot_detection import detect_shots_existing_project
+from core.story import build_story_timeline_existing_project
 from core.vision import analyze_vision_existing_project
 
 
@@ -85,6 +87,16 @@ def main() -> None:
     expand.add_argument("--top-candidates", type=int, default=120)
     expand.add_argument("--min-ai-score", type=float, default=30.0)
     expand.add_argument("--max-segments-per-video", type=int, default=6)
+
+    story = sub.add_parser("story-timeline", help="Build story-based wedding timeline from candidate pool")
+    story.add_argument("--project", required=True)
+    story.add_argument("--input-json", required=False)
+    story.add_argument("--target-duration", type=float, default=60.0)
+    story.add_argument("--max-segments-per-video", type=int, default=1)
+
+    manual = sub.add_parser("manual-review", help="Generate KEEP/MAYBE/REJECT manual review HTML")
+    manual.add_argument("--project", required=True)
+    manual.add_argument("--input-json", required=False)
 
     args = parser.parse_args()
 
@@ -189,6 +201,22 @@ def main() -> None:
             top_candidates=args.top_candidates,
             min_ai_score=args.min_ai_score,
             max_segments_per_video=args.max_segments_per_video,
+        )
+        return
+
+    if args.command == "story-timeline":
+        build_story_timeline_existing_project(
+            project_root=Path(args.project),
+            input_json=Path(args.input_json) if args.input_json else None,
+            target_duration_seconds=args.target_duration,
+            max_segments_per_video=args.max_segments_per_video,
+        )
+        return
+
+    if args.command == "manual-review":
+        generate_manual_review_existing_project(
+            project_root=Path(args.project),
+            input_json=Path(args.input_json) if args.input_json else None,
         )
         return
 
