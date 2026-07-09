@@ -1,146 +1,116 @@
-
 from __future__ import annotations
-
-import os
-import shutil
-import subprocess
-import sys
+import os, shutil, subprocess, sys
 from pathlib import Path
-
-
 APP_NAME = "STT AI Editor"
 
-
 def run(cmd: list[str], cwd: Path) -> None:
-    print()
-    print("RUN:")
-    print(" ".join(cmd))
-    print("-" * 80)
+    print(); print("RUN:"); print(" ".join(cmd)); print("-"*80)
     subprocess.run(cmd, cwd=str(cwd), check=True)
-
 
 def ensure_pyinstaller(repo_root: Path) -> None:
     try:
-        import PyInstaller  # noqa: F401
-        print("PyInstaller found.")
-        return
+        import PyInstaller  # noqa
+        print("PyInstaller found."); return
     except Exception:
         pass
-
-    print("PyInstaller is not installed.")
-    print("Installing PyInstaller into current venv...")
     run([sys.executable, "-m", "pip", "install", "pyinstaller"], cwd=repo_root)
-
 
 def add_data_arg(src: Path, dst: str) -> str:
     return f"{src}{os.pathsep}{dst}"
-
 
 def build_exe(clean: bool = True) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     entry = repo_root / "scripts" / "run_gui.py"
     live_script = repo_root / "scripts" / "run_live_manual_review.py"
-
-    if not entry.exists():
-        raise FileNotFoundError(f"Missing GUI entry: {entry}")
-
-    if not live_script.exists():
-        raise FileNotFoundError(f"Missing live review script: {live_script}")
-
+    if not entry.exists(): raise FileNotFoundError(f"Missing GUI entry: {entry}")
+    if not live_script.exists(): raise FileNotFoundError(f"Missing live review script: {live_script}")
     ensure_pyinstaller(repo_root)
-
     if clean:
         for folder in [repo_root / "build", repo_root / "dist"]:
-            if folder.exists():
-                print(f"Removing: {folder}")
-                shutil.rmtree(folder, ignore_errors=True)
-
+            if folder.exists(): shutil.rmtree(folder, ignore_errors=True)
         for spec in repo_root.glob("*.spec"):
-            if spec.name.startswith("STT AI Editor"):
-                print(f"Removing spec: {spec}")
-                spec.unlink(missing_ok=True)
+            if spec.name.startswith("STT AI Editor"): spec.unlink(missing_ok=True)
 
     hidden_imports = [
-        "cv2", "numpy", "sqlalchemy", "ffmpeg",
-        "core.gui", "core.gui.exe_live_patch", "core.gui.production_patch",
-        "core.gui.premiere_bridge_patch", "core.gui.premiere_xml_validator_patch",
-        "core.gui.premiere_jsx_helper_patch", "core.gui.premiere_script_installer_patch",
-        "core.gui.premiere_panel_patch", "core.gui.premiere_pointer_patch",
-        "core.gui.premiere_panel_sync_patch", "core.gui.style_profile_patch",
-        "core.gui.ai_style_memory_patch", "core.gui.ai_shot_scorer_patch",
-        "core.gui.prewedding_selector_patch", "core.gui.prewedding_roughcut_patch",
-        "core.gui.prewedding_refiner_patch", "core.gui.prewedding_xml_patch",
-        "core.gui.prewedding_pipeline_patch", "core.gui.prewedding_doctor_patch",
-        "core.gui.compact_scroll_patch",
-        "core.project", "core.pipeline", "core.pipeline_v2",
-        "core.wedding_scene", "core.story_v2", "core.duplicate_remover",
-        "core.feedback_learning", "core.xml_options", "core.manual_review",
-        "core.manual_live", "core.manual_live.live_review_server",
-        "core.manual_export", "core.exporter", "core.review",
-        "core.project_presets", "core.export_cleaner", "core.app_health",
-        "core.app_health.health", "core.premiere_bridge", "core.premiere_bridge.bridge",
-        "core.premiere_bridge.validator", "core.premiere_bridge.jsx_helper",
-        "core.premiere_bridge.script_installer", "core.premiere_bridge.panel_installer",
-        "core.premiere_bridge.pointer", "core.premiere_bridge.panel_sync",
-        "core.style_profile", "core.style_profile.profile",
-        "core.ai_style_memory", "core.ai_style_memory.memory",
-        "core.ai_shot_scorer", "core.ai_shot_scorer.scorer",
-        "core.prewedding_selector", "core.prewedding_selector.selector",
-        "core.prewedding_roughcut", "core.prewedding_roughcut.builder",
-        "core.prewedding_refiner", "core.prewedding_refiner.refiner",
-        "core.prewedding_xml", "core.prewedding_xml.exporter",
-        "core.prewedding_pipeline", "core.prewedding_pipeline.runner",
-        "core.prewedding_doctor", "core.prewedding_doctor.doctor",
+        'cv2',
+        'numpy',
+        'sqlalchemy',
+        'ffmpeg',
+        'core.gui',
+        'core.gui.exe_live_patch',
+        'core.gui.production_patch',
+        'core.gui.premiere_bridge_patch',
+        'core.gui.premiere_xml_validator_patch',
+        'core.gui.premiere_jsx_helper_patch',
+        'core.gui.premiere_script_installer_patch',
+        'core.gui.premiere_panel_patch',
+        'core.gui.premiere_pointer_patch',
+        'core.gui.premiere_panel_sync_patch',
+        'core.gui.style_profile_patch',
+        'core.gui.ai_style_memory_patch',
+        'core.gui.ai_shot_scorer_patch',
+        'core.gui.prewedding_selector_patch',
+        'core.gui.prewedding_roughcut_patch',
+        'core.gui.prewedding_refiner_patch',
+        'core.gui.prewedding_xml_patch',
+        'core.gui.prewedding_pipeline_patch',
+        'core.gui.prewedding_doctor_patch',
+        'core.gui.release_packager_patch',
+        'core.gui.compact_scroll_patch',
+        'core.ai_shot_scorer',
+        'core.ai_shot_scorer.scorer',
+        'core.prewedding_selector',
+        'core.prewedding_selector.selector',
+        'core.prewedding_roughcut',
+        'core.prewedding_roughcut.builder',
+        'core.prewedding_refiner',
+        'core.prewedding_refiner.refiner',
+        'core.prewedding_xml',
+        'core.prewedding_xml.exporter',
+        'core.prewedding_pipeline',
+        'core.prewedding_pipeline.runner',
+        'core.prewedding_doctor',
+        'core.prewedding_doctor.doctor',
+        'core.release_packager',
+        'core.release_packager.packager',
+        'core.manual_live',
+        'core.manual_live.live_review_server',
+        'core.gui.pipeline_snapshot_patch',
+        'core.pipeline_snapshot',
+        'core.pipeline_snapshot.snapshot',
+        'core.gui.prewedding_batch_patch',
+        'core.prewedding_batch',
+        'core.prewedding_batch.batch',
+        'core.gui.premiere_relink_helper_patch',
+        'core.premiere_relink_helper',
+        'core.premiere_relink_helper.relink',
+        'core.gui.music_beat_plan_patch',
+        'core.music_beat_plan',
+        'core.music_beat_plan.beat_plan',
+        'core.gui.review_package_patch',
+        'core.review_package',
+        'core.review_package.package',
+        'core.gui.workflow_templates_patch',
+        'core.workflow_templates',
+        'core.workflow_templates.templates',
+        'core.gui.master_dashboard_patch',
+        'core.master_dashboard',
+        'core.master_dashboard.dashboard'
     ]
 
-    cmd = [
-        sys.executable, "-m", "PyInstaller",
-        "--noconfirm", "--clean", "--onedir", "--windowed",
-        "--name", APP_NAME,
-        "--add-data", add_data_arg(live_script, "scripts"),
-        "--collect-all", "PySide6",
-    ]
-
-    for item in hidden_imports:
-        cmd += ["--hidden-import", item]
-
+    cmd = [sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--onedir", "--windowed",
+           "--name", APP_NAME, "--add-data", add_data_arg(live_script, "scripts"), "--collect-all", "PySide6"]
+    for item in hidden_imports: cmd += ["--hidden-import", item]
     cmd.append(str(entry))
     run(cmd, cwd=repo_root)
-
     exe_path = repo_root / "dist" / APP_NAME / f"{APP_NAME}.exe"
-    bundled_live_script = repo_root / "dist" / APP_NAME / "_internal" / "scripts" / "run_live_manual_review.py"
-
-    print()
-    print("=" * 80)
-    print("BUILD FINISHED")
-    print("=" * 80)
-
+    print(); print("="*80); print("BUILD FINISHED"); print("="*80)
+    print("EXE:", exe_path)
     if exe_path.exists():
-        print("EXE:")
-        print(exe_path)
-        print()
-        if bundled_live_script.exists():
-            print("Live Review script bundled OK:")
-            print(bundled_live_script)
-        else:
-            print("WARNING: Live Review script missing, but Module 034C can run live server in-process:")
-            print(bundled_live_script)
-        print()
-        print("Run test:")
-        print(f'& "{exe_path}"')
-        print()
-        print("Folder to copy to another Windows PC:")
-        print(exe_path.parent)
         os.startfile(exe_path.parent)
-    else:
-        print("Build finished but EXE was not found at expected path:")
-        print(exe_path)
-
 
 def main() -> None:
-    clean = "--no-clean" not in sys.argv
-    build_exe(clean=clean)
-
+    build_exe(clean="--no-clean" not in sys.argv)
 
 if __name__ == "__main__":
     main()
