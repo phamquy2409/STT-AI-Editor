@@ -1,0 +1,129 @@
+from __future__ import annotations
+
+import csv
+import json
+import os
+import shutil
+import zipfile
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+DEFAULT_PROJECT_ROOT = "D:/STT Projects/Wedding_Test_001"
+
+
+def appdata_dir() -> Path:
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        return Path(appdata) / "STT_AI_Editor"
+    return Path.home() / "AppData" / "Roaming" / "STT_AI_Editor"
+
+
+def ensure_report_dir(project_root: Path, name: str) -> Path:
+    out = project_root / "exports" / f"{name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    out.mkdir(parents=True, exist_ok=True)
+    return out
+
+
+def load_json(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def latest_existing(project_root: Path, names: list[str]) -> Path | None:
+    for name in names:
+        p = project_root / name
+        if p.exists():
+            return p
+    return None
+
+
+def load_timeline(project_root: Path) -> list[dict[str, Any]]:
+    for name in ["stt_prewedding_refined_v1.json", "stt_prewedding_roughcut_v1.json", "stt_prewedding_selection_v1.json"]:
+        p = project_root / name
+        data = load_json(p)
+        if isinstance(data.get("timeline"), list):
+            return data["timeline"]
+    return []
+
+
+def write_json(path: Path, data: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def write_csv(path: Path, rows: list[dict[str, Any]], fieldnames: list[str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8-sig", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({k: row.get(k, "") for k in fieldnames})
+
+
+def simple_html(title: str, rows: list[dict[str, Any]], columns: list[str], note: str = "") -> str:
+    import html
+    header = "".join(f"<th>{html.escape(c)}</th>" for c in columns)
+    body = ""
+    for row in rows:
+        body += "<tr>" + "".join(f"<td>{html.escape(str(row.get(c, '')))}</td>" for c in columns) + "</tr>"
+    return (
+        "<!doctype html><html lang='vi'><head><meta charset='utf-8'>"
+        f"<title>{html.escape(title)}</title>"
+        "<style>body{font-family:Arial,sans-serif;background:#111;color:#eee;margin:32px;line-height:1.55}"
+        ".card{max-width:1500px;background:#181818;border:1px solid #333;border-radius:16px;padding:24px}"
+        "table{border-collapse:collapse;width:100%;margin-top:12px}th,td{border-bottom:1px solid #333;padding:8px;vertical-align:top;text-align:left}"
+        "code{background:#000;padding:4px 8px;border-radius:8px}</style></head><body><div class='card'>"
+        f"<h1>{html.escape(title)}</h1><p>{html.escape(note)}</p>"
+        f"<table><tr>{header}</tr>{body}</table></div></body></html>"
+    )
+
+
+
+def create_timeline_qc_report(project_root: str | Path = DEFAULT_PROJECT_ROOT, open_folder: bool = True) -> dict[str, Any]:
+    project_root = Path(project_root)
+    out = ensure_report_dir(project_root, "timeline_qc_report")
+    timeline = load_timeline(project_root)
+    rows = []
+    warnings = []
+    last_file = None
+    for clip in timeline:
+        f = str(clip.get("file") or "")
+        dur = float(clip.get("timeline_duration", 0) or 0)
+        issue = []
+        if dur < 0.5:
+            issue.append("too_short")
+        if dur > 8:
+            issue.append("too_long")
+        if f and f == last_file:
+            issue.append("same_source_adjacent")
+        if not f:
+            issue.append("missing_file_path")
+        if issue:
+            warnings.extend(issue)
+        rows.append({
+            "timeline_index": clip.get("timeline_index"),
+            "start": clip.get("timeline_start"),
+            "duration": dur,
+            "role": clip.get("roughcut_role") or clip.get("section"),
+            "score": clip.get("ai_score"),
+            "issue": ",".join(issue),
+            "file": f,
+        })
+        last_file = f
+    if not rows:
+        rows = [{"timeline_index": 0, "start": "", "duration": "", "role": "", "score": "", "issue": "no_timeline", "file": ""}]
+        warnings.append("no_timeline")
+    columns = ["timeline_index", "start", "duration", "role", "score", "issue", "file"]
+    write_csv(out / "TIMELINE_QC_REPORT.csv", rows, columns)
+    write_json(out / "timeline_qc_report.json", {"ok": True, "module": "068_timeline_qc", "rows": rows, "warnings": warnings})
+    (out / "TIMELINE_QC_REPORT.html").write_text(simple_html("Timeline QC Report", rows, columns, "QC timeline trước khi final."), encoding="utf-8")
+    if open_folder:
+        try: os.startfile(out)
+        except Exception: pass
+    return {"ok": True, "output_dir": str(out), "report_dir": str(out), "clip_count": len(rows), "warning_count": len(warnings)}
+
