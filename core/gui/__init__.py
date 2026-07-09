@@ -67,4 +67,10 @@ try:
 except Exception as exc:
     print(f"STT GUI AI style memory patch skipped: {exc!r}")
 
+try:
+    from .ai_shot_scorer_patch import apply_ai_shot_scorer_patch
+    apply_ai_shot_scorer_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI AI shot scorer patch skipped: {exc!r}")
+
 __all__ = ["STTAIEditorWindow", "run_gui"]
