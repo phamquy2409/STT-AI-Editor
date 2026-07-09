@@ -1,10 +1,11 @@
+
 from .simple_gui import STTAIEditorWindow, run_gui
 
 try:
     from .exe_live_patch import apply_live_server_patch
     apply_live_server_patch(STTAIEditorWindow)
 except Exception as exc:
-    print(f"STT GUI exe live patch skipped: {exc!r}")
+    print(f"STT GUI live server patch skipped: {exc!r}")
 
 try:
     from .production_patch import apply_production_gui_patch
@@ -22,13 +23,13 @@ try:
     from .premiere_xml_validator_patch import apply_premiere_xml_validator_patch
     apply_premiere_xml_validator_patch(STTAIEditorWindow)
 except Exception as exc:
-    print(f"STT GUI premiere xml validator patch skipped: {exc!r}")
+    print(f"STT GUI premiere XML validator patch skipped: {exc!r}")
 
 try:
     from .premiere_jsx_helper_patch import apply_premiere_jsx_helper_patch
     apply_premiere_jsx_helper_patch(STTAIEditorWindow)
 except Exception as exc:
-    print(f"STT GUI premiere jsx helper patch skipped: {exc!r}")
+    print(f"STT GUI premiere JSX helper patch skipped: {exc!r}")
 
 try:
     from .premiere_script_installer_patch import apply_premiere_script_installer_patch
@@ -64,13 +65,13 @@ try:
     from .ai_style_memory_patch import apply_ai_style_memory_patch
     apply_ai_style_memory_patch(STTAIEditorWindow)
 except Exception as exc:
-    print(f"STT GUI ai style memory patch skipped: {exc!r}")
+    print(f"STT GUI AI style memory patch skipped: {exc!r}")
 
 try:
     from .ai_shot_scorer_patch import apply_ai_shot_scorer_patch
     apply_ai_shot_scorer_patch(STTAIEditorWindow)
 except Exception as exc:
-    print(f"STT GUI ai shot scorer patch skipped: {exc!r}")
+    print(f"STT GUI AI shot scorer patch skipped: {exc!r}")
 
 try:
     from .prewedding_selector_patch import apply_prewedding_selector_patch
@@ -94,7 +95,7 @@ try:
     from .prewedding_xml_patch import apply_prewedding_xml_patch
     apply_prewedding_xml_patch(STTAIEditorWindow)
 except Exception as exc:
-    print(f"STT GUI prewedding xml patch skipped: {exc!r}")
+    print(f"STT GUI prewedding XML patch skipped: {exc!r}")
 
 try:
     from .prewedding_pipeline_patch import apply_prewedding_pipeline_patch
@@ -121,10 +122,10 @@ except Exception as exc:
     print(f"STT GUI pipeline snapshot patch skipped: {exc!r}")
 
 try:
-    from .prewedding_batch_patch import apply_prewedding_batch_patch
-    apply_prewedding_batch_patch(STTAIEditorWindow)
+    from .prewedding_batch_plan_patch import apply_prewedding_batch_plan_patch
+    apply_prewedding_batch_plan_patch(STTAIEditorWindow)
 except Exception as exc:
-    print(f"STT GUI prewedding batch patch skipped: {exc!r}")
+    print(f"STT GUI prewedding batch plan patch skipped: {exc!r}")
 
 try:
     from .premiere_relink_helper_patch import apply_premiere_relink_helper_patch
