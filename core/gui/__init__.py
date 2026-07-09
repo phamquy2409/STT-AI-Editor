@@ -1,3 +1,4 @@
+
 from .simple_gui import STTAIEditorWindow, run_gui
 
 try:
@@ -20,5 +21,12 @@ try:
     apply_premiere_bridge_patch(STTAIEditorWindow)
 except Exception as exc:
     print(f"STT GUI premiere bridge patch skipped: {exc!r}")
+
+try:
+    from .premiere_xml_validator_patch import apply_premiere_xml_validator_patch
+
+    apply_premiere_xml_validator_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI premiere XML validator patch skipped: {exc!r}")
 
 __all__ = ["STTAIEditorWindow", "run_gui"]

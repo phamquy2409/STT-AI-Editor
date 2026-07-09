@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 import os
@@ -32,7 +33,6 @@ def ensure_pyinstaller(repo_root: Path) -> None:
 
 
 def add_data_arg(src: Path, dst: str) -> str:
-    # PyInstaller uses ";" on Windows and ":" on macOS/Linux.
     return f"{src}{os.pathsep}{dst}"
 
 
@@ -45,10 +45,7 @@ def build_exe(clean: bool = True) -> None:
         raise FileNotFoundError(f"Missing GUI entry: {entry}")
 
     if not live_script.exists():
-        raise FileNotFoundError(
-            f"Missing live review script: {live_script}\n"
-            "Install Module 020/031 first."
-        )
+        raise FileNotFoundError(f"Missing live review script: {live_script}")
 
     ensure_pyinstaller(repo_root)
 
@@ -63,6 +60,39 @@ def build_exe(clean: bool = True) -> None:
                 print(f"Removing spec: {spec}")
                 spec.unlink(missing_ok=True)
 
+    hidden_imports = [
+        "cv2",
+        "numpy",
+        "sqlalchemy",
+        "ffmpeg",
+        "core.gui",
+        "core.gui.exe_live_patch",
+        "core.gui.production_patch",
+        "core.gui.premiere_bridge_patch",
+        "core.gui.premiere_xml_validator_patch",
+        "core.project",
+        "core.pipeline",
+        "core.pipeline_v2",
+        "core.wedding_scene",
+        "core.story_v2",
+        "core.duplicate_remover",
+        "core.feedback_learning",
+        "core.xml_options",
+        "core.manual_review",
+        "core.manual_live",
+        "core.manual_live.live_review_server",
+        "core.manual_export",
+        "core.exporter",
+        "core.review",
+        "core.project_presets",
+        "core.export_cleaner",
+        "core.app_health",
+        "core.app_health.health",
+        "core.premiere_bridge",
+        "core.premiere_bridge.bridge",
+        "core.premiere_bridge.validator",
+    ]
+
     cmd = [
         sys.executable,
         "-m",
@@ -73,73 +103,16 @@ def build_exe(clean: bool = True) -> None:
         "--windowed",
         "--name",
         APP_NAME,
-
         "--add-data",
         add_data_arg(live_script, "scripts"),
-
         "--collect-all",
         "PySide6",
-
-        "--hidden-import",
-        "cv2",
-        "--hidden-import",
-        "numpy",
-        "--hidden-import",
-        "sqlalchemy",
-        "--hidden-import",
-        "ffmpeg",
-
-        "--hidden-import",
-        "core.gui",
-        "--hidden-import",
-        "core.gui.exe_live_patch",
-        "--hidden-import",
-        "core.gui.production_patch",
-        "--hidden-import",
-        "core.gui.premiere_bridge_patch",
-        "--hidden-import",
-        "core.project",
-        "--hidden-import",
-        "core.pipeline",
-        "--hidden-import",
-        "core.pipeline_v2",
-        "--hidden-import",
-        "core.wedding_scene",
-        "--hidden-import",
-        "core.story_v2",
-        "--hidden-import",
-        "core.duplicate_remover",
-        "--hidden-import",
-        "core.feedback_learning",
-        "--hidden-import",
-        "core.xml_options",
-        "--hidden-import",
-        "core.manual_review",
-        "--hidden-import",
-        "core.manual_live",
-        "--hidden-import",
-        "core.manual_live.live_review_server",
-        "--hidden-import",
-        "core.manual_export",
-        "--hidden-import",
-        "core.exporter",
-        "--hidden-import",
-        "core.review",
-        "--hidden-import",
-        "core.project_presets",
-        "--hidden-import",
-        "core.export_cleaner",
-        "--hidden-import",
-        "core.app_health",
-        "--hidden-import",
-        "core.app_health.health",
-        "--hidden-import",
-        "core.premiere_bridge",
-        "--hidden-import",
-        "core.premiere_bridge.bridge",
-
-        str(entry),
     ]
+
+    for item in hidden_imports:
+        cmd += ["--hidden-import", item]
+
+    cmd.append(str(entry))
 
     run(cmd, cwd=repo_root)
 
@@ -173,7 +146,6 @@ def build_exe(clean: bool = True) -> None:
     else:
         print("Build finished but EXE was not found at expected path:")
         print(exe_path)
-        print("Check the dist folder manually.")
 
 
 def main() -> None:
