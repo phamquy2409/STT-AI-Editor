@@ -116,6 +116,12 @@ except Exception as exc:
     print(f"STT GUI release packager patch skipped: {exc!r}")
 
 try:
+    from .project_command_center_patch import apply_project_command_center_patch
+    apply_project_command_center_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI project command center patch skipped: {exc!r}")
+
+try:
     from .pipeline_snapshot_patch import apply_pipeline_snapshot_patch
     apply_pipeline_snapshot_patch(STTAIEditorWindow)
 except Exception as exc:
