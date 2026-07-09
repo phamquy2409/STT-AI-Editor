@@ -1,11 +1,12 @@
-from .manual_review import (
+
+from .reviewer import (
     ManualReviewConfig,
-    ManualReviewGenerator,
+    ModernManualReviewGenerator,
     generate_manual_review_existing_project,
 )
 
 __all__ = [
     "ManualReviewConfig",
-    "ManualReviewGenerator",
+    "ModernManualReviewGenerator",
     "generate_manual_review_existing_project",
 ]
