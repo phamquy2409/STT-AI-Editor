@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from core.expansion import expand_candidates_existing_project
 from core.exporter import export_premiere_xml_existing_project
 from core.final_cut import build_final_roughcut_existing_project
 from core.media import scan_existing_project
@@ -68,7 +69,7 @@ def main() -> None:
     moment.add_argument("--segment-seconds", type=float, default=2.2)
     moment.add_argument("--sample-step", type=float, default=0.25)
 
-    people = sub.add_parser("people-composition", help="Analyze faces/people/composition on selected moments")
+    people = sub.add_parser("people-composition", help="Analyze people/composition on selected moments")
     people.add_argument("--project", required=True)
     people.add_argument("--input-json", required=False)
 
@@ -78,6 +79,12 @@ def main() -> None:
     final.add_argument("--target-duration", type=float, default=60.0)
     final.add_argument("--min-final-score", type=float, default=20.0)
     final.add_argument("--max-segments-per-video", type=int, default=2)
+
+    expand = sub.add_parser("expand-candidates", help="Create larger candidate pool from all DB segments")
+    expand.add_argument("--project", required=True)
+    expand.add_argument("--top-candidates", type=int, default=120)
+    expand.add_argument("--min-ai-score", type=float, default=30.0)
+    expand.add_argument("--max-segments-per-video", type=int, default=6)
 
     args = parser.parse_args()
 
@@ -172,6 +179,15 @@ def main() -> None:
             input_json=Path(args.input_json) if args.input_json else None,
             target_duration_seconds=args.target_duration,
             min_final_score=args.min_final_score,
+            max_segments_per_video=args.max_segments_per_video,
+        )
+        return
+
+    if args.command == "expand-candidates":
+        expand_candidates_existing_project(
+            project_root=Path(args.project),
+            top_candidates=args.top_candidates,
+            min_ai_score=args.min_ai_score,
             max_segments_per_video=args.max_segments_per_video,
         )
         return
