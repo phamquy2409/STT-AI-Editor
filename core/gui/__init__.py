@@ -80,6 +80,18 @@ except Exception as exc:
     print(f"STT GUI prewedding selector patch skipped: {exc!r}")
 
 try:
+    from .prewedding_roughcut_patch import apply_prewedding_roughcut_patch
+    apply_prewedding_roughcut_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI prewedding roughcut patch skipped: {exc!r}")
+
+try:
+    from .prewedding_xml_patch import apply_prewedding_xml_patch
+    apply_prewedding_xml_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI prewedding XML patch skipped: {exc!r}")
+
+try:
     from .compact_scroll_patch import apply_compact_scroll_patch
     apply_compact_scroll_patch(STTAIEditorWindow)
 except Exception as exc:
