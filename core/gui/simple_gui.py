@@ -163,9 +163,10 @@ class STTAIEditorWindow(QMainWindow):
         self.worker: Worker | None = None
         self.last_result: dict[str, Any] = {}
         self.live_manual_process: subprocess.Popen | None = None
+        self.auto_open_live_after_done = False
 
         self.setWindowTitle("STT AI Editor")
-        self.resize(1180, 900)
+        self.resize(1220, 930)
 
         self.projects_root_edit = QLineEdit(self.defaults.projects_root)
         self.project_name_edit = QLineEdit(self.defaults.project_name)
@@ -197,6 +198,9 @@ class STTAIEditorWindow(QMainWindow):
         self.live_status_label = QLabel("Live Manual: OFF")
         self.live_status_label.setStyleSheet("font-weight:700; color:#aaaab2;")
 
+        self.workflow_label = QLabel("Workflow: Run Final V2 → KEEP/REJECT → Save → Export Latest XML")
+        self.workflow_label.setStyleSheet("font-weight:700; color:#ffd166;")
+
         self.log_box = QPlainTextEdit()
         self.log_box.setReadOnly(True)
         self.log_box.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
@@ -207,6 +211,7 @@ class STTAIEditorWindow(QMainWindow):
         layout = QVBoxLayout(root)
         layout.addWidget(self._build_create_project_box())
         layout.addWidget(self._build_active_project_box())
+        layout.addWidget(self._build_final_workflow_box())
         layout.addWidget(self._build_action_box())
         layout.addWidget(self._build_manual_live_box())
         layout.addWidget(self._build_open_box())
@@ -273,8 +278,29 @@ class STTAIEditorWindow(QMainWindow):
         grid.setColumnStretch(1, 1)
         return box
 
+    def _build_final_workflow_box(self) -> QGroupBox:
+        box = QGroupBox("Final Workflow - Recommended")
+        row = QHBoxLayout(box)
+
+        self.run_final_v2_btn = QPushButton("Run Final Wedding V2 + Live Review")
+        self.run_final_v2_btn.clicked.connect(self.run_final_wedding_v2_workflow)
+
+        self.export_latest_big_btn = QPushButton("Export Latest Manual XML")
+        self.export_latest_big_btn.clicked.connect(self.export_latest_manual_xml)
+
+        self.open_latest_xml_big_btn = QPushButton("Open Latest XML Folder")
+        self.open_latest_xml_big_btn.clicked.connect(self.open_latest_xml_folder)
+
+        row.addWidget(self.run_final_v2_btn)
+        row.addWidget(self.export_latest_big_btn)
+        row.addWidget(self.open_latest_xml_big_btn)
+        row.addStretch(1)
+        row.addWidget(self.workflow_label)
+
+        return box
+
     def _build_action_box(self) -> QGroupBox:
-        box = QGroupBox("Run Pipeline")
+        box = QGroupBox("Run Pipeline / Legacy")
         row = QHBoxLayout(box)
 
         self.run_pipeline_btn = QPushButton("Run Pipeline Old")
@@ -477,6 +503,16 @@ class STTAIEditorWindow(QMainWindow):
             self.append_log("CREATE PROJECT ERROR")
             self.append_log(traceback.format_exc())
 
+    def run_final_wedding_v2_workflow(self) -> None:
+        self.auto_open_live_after_done = True
+        self.append_log("")
+        self.append_log("FINAL WORKFLOW START")
+        self.append_log("Step 1: Run Wedding Pipeline V2")
+        self.append_log("Step 2: Auto open Live Manual Review after pipeline")
+        self.append_log("Step 3: KEEP/REJECT + Save to Project Folder")
+        self.append_log("Step 4: Back to GUI, click Export Latest Manual XML")
+        self.run_wedding_pipeline_v2()
+
     def run_pipeline(self) -> None:
         if self.from_scratch_check.isChecked():
             ok = QMessageBox.question(
@@ -577,7 +613,7 @@ class STTAIEditorWindow(QMainWindow):
             self.append_log("LIVE MANUAL REVIEW SERVER STARTED")
             self.append_log(f"PID: {self.live_manual_process.pid}")
             self.append_log(f"URL: {url}")
-            self.append_log("Sau khi KEEP/REJECT xong, bấm Save to Project Folder trong browser.")
+            self.append_log("Trong browser: KEEP / REJECT → Save to Project Folder.")
             self.append_log("Sau đó quay lại GUI bấm Export Latest Manual XML.")
             self.set_live_status(True)
             webbrowser.open(url)
@@ -598,7 +634,6 @@ class STTAIEditorWindow(QMainWindow):
 
         try:
             if os.name == "nt":
-                # Terminate is safer inside GUI. The saved json is already written before this step.
                 proc.terminate()
             else:
                 proc.send_signal(signal.SIGTERM)
@@ -678,6 +713,13 @@ class STTAIEditorWindow(QMainWindow):
         self.append_log(str(result))
         self.set_running(False)
 
+        if self.auto_open_live_after_done:
+            self.auto_open_live_after_done = False
+            self.append_log("")
+            self.append_log("Pipeline done. Opening Live Manual Review automatically ...")
+            self.open_live_manual_review()
+            return
+
         html = (
             result.get("manual_review_html")
             or result.get("review_html")
@@ -691,17 +733,20 @@ class STTAIEditorWindow(QMainWindow):
             os.startfile(html)
 
     def worker_error(self, message: str) -> None:
+        self.auto_open_live_after_done = False
         self.append_log("ERROR")
         self.append_log(message)
         self.set_running(False)
         QMessageBox.critical(self, "Error", message[-4000:])
 
     def set_running(self, running: bool) -> None:
+        self.run_final_v2_btn.setDisabled(running)
         self.run_pipeline_btn.setDisabled(running)
         self.run_wedding_v2_btn.setDisabled(running)
         self.manual_review_btn.setDisabled(running)
         self.manual_export_btn.setDisabled(running)
         self.export_latest_manual_btn.setDisabled(running)
+        self.export_latest_big_btn.setDisabled(running)
         self.status_label.setText("Running..." if running else "Ready")
         self.status_label.setStyleSheet(
             "font-weight:700; color:#ffd166;" if running else "font-weight:700; color:#8ef0b0;"
@@ -761,7 +806,6 @@ class STTAIEditorWindow(QMainWindow):
         os.startfile(files[0].parent)
 
     def closeEvent(self, event) -> None:
-        # Stop live server when closing GUI so the port is not left running.
         if self.live_manual_process and self.live_manual_process.poll() is None:
             try:
                 self.live_manual_process.terminate()
