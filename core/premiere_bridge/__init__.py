@@ -1,6 +1,7 @@
 
 from .bridge import PremiereBridgeConfig, PremiereBridgeExporter, export_premiere_bridge
 from .jsx_helper import PremiereJSXHelper, PremiereJSXHelperConfig, create_premiere_jsx_helper
+from .panel_installer import PremierePanelInstaller, PremierePanelInstallerConfig, create_premiere_panel
 from .script_installer import PremiereScriptInstaller, PremiereScriptInstallerConfig, install_premiere_script
 from .validator import PremiereXMLValidationConfig, PremiereXMLValidator, validate_premiere_xml
 
@@ -9,11 +10,14 @@ __all__ = [
     "PremiereBridgeExporter",
     "PremiereJSXHelper",
     "PremiereJSXHelperConfig",
+    "PremierePanelInstaller",
+    "PremierePanelInstallerConfig",
     "PremiereScriptInstaller",
     "PremiereScriptInstallerConfig",
     "PremiereXMLValidationConfig",
     "PremiereXMLValidator",
     "create_premiere_jsx_helper",
+    "create_premiere_panel",
     "export_premiere_bridge",
     "install_premiere_script",
     "validate_premiere_xml",

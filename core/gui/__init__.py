@@ -43,4 +43,11 @@ try:
 except Exception as exc:
     print(f"STT GUI premiere script installer patch skipped: {exc!r}")
 
+try:
+    from .premiere_panel_patch import apply_premiere_panel_patch
+
+    apply_premiere_panel_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI premiere panel patch skipped: {exc!r}")
+
 __all__ = ["STTAIEditorWindow", "run_gui"]
