@@ -76,7 +76,6 @@ def build_exe(clean: bool = True) -> None:
         "core.gui.ai_style_memory_patch",
         "core.gui.ai_shot_scorer_patch",
         "core.gui.prewedding_selector_patch",
-        "core.gui.prewedding_roughcut_patch",
         "core.gui.prewedding_xml_patch",
         "core.gui.compact_scroll_patch",
         "core.project",
@@ -113,8 +112,6 @@ def build_exe(clean: bool = True) -> None:
         "core.ai_shot_scorer.scorer",
         "core.prewedding_selector",
         "core.prewedding_selector.selector",
-        "core.prewedding_roughcut",
-        "core.prewedding_roughcut.builder",
         "core.prewedding_xml",
         "core.prewedding_xml.exporter",
     ]
