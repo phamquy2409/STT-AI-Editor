@@ -6,6 +6,7 @@ from pathlib import Path
 from core.exporter import export_premiere_xml_existing_project
 from core.media import scan_existing_project
 from core.moment import find_best_moments_existing_project
+from core.people_composition import analyze_people_composition_existing_project
 from core.project import ProjectManager
 from core.reporting import generate_report_existing_project
 from core.review import generate_preview_review_existing_project
@@ -65,6 +66,10 @@ def main() -> None:
     moment.add_argument("--roughcut-json", required=False)
     moment.add_argument("--segment-seconds", type=float, default=2.2)
     moment.add_argument("--sample-step", type=float, default=0.25)
+
+    people = sub.add_parser("people-composition", help="Analyze faces/people/composition on selected moments")
+    people.add_argument("--project", required=True)
+    people.add_argument("--input-json", required=False)
 
     args = parser.parse_args()
 
@@ -143,6 +148,13 @@ def main() -> None:
             roughcut_json=Path(args.roughcut_json) if args.roughcut_json else None,
             refined_segment_seconds=args.segment_seconds,
             sample_step_seconds=args.sample_step,
+        )
+        return
+
+    if args.command == "people-composition":
+        analyze_people_composition_existing_project(
+            project_root=Path(args.project),
+            input_json=Path(args.input_json) if args.input_json else None,
         )
         return
 
