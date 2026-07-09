@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
 )
 
+from core.export_cleaner import archive_old_exports_existing_project, preview_export_cleanup_existing_project
 from core.exporter import export_premiere_xml_existing_project
 from core.manual_export import build_manual_selection_existing_project
 from core.manual_review import generate_manual_review_existing_project
@@ -50,20 +51,12 @@ class GuiDefaults:
     target_duration: int = 60
     top_candidates: int = 120
     live_manual_port: int = 8787
-    window_width: int = 1220
-    window_height: int = 930
+    keep_latest_exports: int = 2
+    window_width: int = 1240
+    window_height: int = 960
 
 
 class GuiSettingsStore:
-    # Build 028.
-    # Saves GUI settings so the app remembers last project/source/duration/port.
-    #
-    # Windows path:
-    # %APPDATA%\STT_AI_Editor\gui_settings.json
-    #
-    # Fallback:
-    # <repo>\.stt_ai_editor\gui_settings.json
-
     def __init__(self, repo_root: Path) -> None:
         self.repo_root = repo_root
         appdata = os.environ.get("APPDATA", "").strip()
@@ -96,6 +89,7 @@ class GuiSettingsStore:
                 target_duration=int(data["target_duration"]),
                 top_candidates=int(data["top_candidates"]),
                 live_manual_port=int(data["live_manual_port"]),
+                keep_latest_exports=int(data["keep_latest_exports"]),
                 window_width=int(data["window_width"]),
                 window_height=int(data["window_height"]),
             )
@@ -216,6 +210,18 @@ class Worker(QObject):
                 "output_dir": manual.get("output_dir", ""),
             }
 
+        if self.action == "preview_exports":
+            return preview_export_cleanup_existing_project(
+                project_root=project_root,
+                keep_latest_per_prefix=int(self.payload.get("keep_latest_exports", 2)),
+            )
+
+        if self.action == "archive_exports":
+            return archive_old_exports_existing_project(
+                project_root=project_root,
+                keep_latest_per_prefix=int(self.payload.get("keep_latest_exports", 2)),
+            )
+
         raise RuntimeError(f"Unknown action: {self.action}")
 
 
@@ -257,6 +263,10 @@ class STTAIEditorWindow(QMainWindow):
         self.live_port_spin.setRange(8000, 9999)
         self.live_port_spin.setValue(self.defaults.live_manual_port)
 
+        self.keep_exports_spin = QSpinBox()
+        self.keep_exports_spin.setRange(1, 20)
+        self.keep_exports_spin.setValue(self.defaults.keep_latest_exports)
+
         self.from_scratch_check = QCheckBox("Run from scratch: scan / detect / analyze lại")
         self.from_scratch_check.setChecked(False)
 
@@ -272,6 +282,9 @@ class STTAIEditorWindow(QMainWindow):
         self.settings_label = QLabel("Settings: loaded")
         self.settings_label.setStyleSheet("font-weight:700; color:#8fd3ff;")
 
+        self.cleanup_label = QLabel("Cleanup: safe archive only")
+        self.cleanup_label.setStyleSheet("font-weight:700; color:#ffd166;")
+
         self.log_box = QPlainTextEdit()
         self.log_box.setReadOnly(True)
         self.log_box.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
@@ -285,6 +298,7 @@ class STTAIEditorWindow(QMainWindow):
         layout.addWidget(self._build_final_workflow_box())
         layout.addWidget(self._build_action_box())
         layout.addWidget(self._build_manual_live_box())
+        layout.addWidget(self._build_cleanup_box())
         layout.addWidget(self._build_settings_box())
         layout.addWidget(self._build_open_box())
         layout.addWidget(QLabel("Log"))
@@ -390,7 +404,6 @@ class STTAIEditorWindow(QMainWindow):
 
         self.run_wedding_v2_btn = QPushButton("Run Wedding Pipeline V2")
         self.run_wedding_v2_btn.clicked.connect(self.run_wedding_pipeline_v2)
-        self.run_wedding_v2_btn.setToolTip("Chạy pipeline mới: Wedding Scene → Story V2 → Remove Duplicate → XML")
 
         self.manual_review_btn = QPushButton("Generate Manual Review Old")
         self.manual_review_btn.clicked.connect(self.generate_manual_review)
@@ -427,6 +440,33 @@ class STTAIEditorWindow(QMainWindow):
         row.addWidget(self.export_latest_manual_btn)
         row.addStretch(1)
         row.addWidget(self.live_status_label)
+
+        return box
+
+    def _build_cleanup_box(self) -> QGroupBox:
+        box = QGroupBox("Clean / Archive Exports")
+        row = QHBoxLayout(box)
+
+        self.preview_cleanup_btn = QPushButton("Preview Cleanup")
+        self.preview_cleanup_btn.clicked.connect(self.preview_export_cleanup)
+
+        self.archive_cleanup_btn = QPushButton("Archive Old Exports")
+        self.archive_cleanup_btn.clicked.connect(self.archive_old_exports)
+
+        self.open_archive_btn = QPushButton("Open Archive")
+        self.open_archive_btn.clicked.connect(self.open_archive_folder)
+
+        self.open_reports_btn = QPushButton("Open Cleanup Reports")
+        self.open_reports_btn.clicked.connect(self.open_cleanup_reports)
+
+        row.addWidget(QLabel("Keep latest per type"))
+        row.addWidget(self.keep_exports_spin)
+        row.addWidget(self.preview_cleanup_btn)
+        row.addWidget(self.archive_cleanup_btn)
+        row.addWidget(self.open_archive_btn)
+        row.addWidget(self.open_reports_btn)
+        row.addStretch(1)
+        row.addWidget(self.cleanup_label)
 
         return box
 
@@ -491,6 +531,7 @@ class STTAIEditorWindow(QMainWindow):
         self.duration_spin.valueChanged.connect(lambda _: self.save_settings(show_popup=False))
         self.candidate_spin.valueChanged.connect(lambda _: self.save_settings(show_popup=False))
         self.live_port_spin.valueChanged.connect(lambda _: self.save_settings(show_popup=False))
+        self.keep_exports_spin.valueChanged.connect(lambda _: self.save_settings(show_popup=False))
 
     def _apply_style(self) -> None:
         self.setStyleSheet("""
@@ -554,6 +595,7 @@ class STTAIEditorWindow(QMainWindow):
             "target_duration": int(self.duration_spin.value()),
             "top_candidates": int(self.candidate_spin.value()),
             "live_manual_port": int(self.live_port_spin.value()),
+            "keep_latest_exports": int(self.keep_exports_spin.value()),
             "window_width": int(size.width()),
             "window_height": int(size.height()),
         }
@@ -563,10 +605,8 @@ class STTAIEditorWindow(QMainWindow):
             path = self.settings_store.save(self.current_settings_dict())
             self.settings_label.setText("Settings: saved")
             self.settings_label.setStyleSheet("font-weight:700; color:#8ef0b0;")
-
             if show_popup:
                 QMessageBox.information(self, "Saved", f"Đã lưu settings:\n{path}")
-
         except Exception:
             self.settings_label.setText("Settings: save error")
             self.settings_label.setStyleSheet("font-weight:700; color:#ff6b6b;")
@@ -846,6 +886,45 @@ class STTAIEditorWindow(QMainWindow):
         self.append_log(f"Using latest manual selection: {selection_json}")
         self.start_worker("manual_export", payload)
 
+    def preview_export_cleanup(self) -> None:
+        self.save_settings(show_popup=False)
+        payload = {
+            "project_root": self.project_edit.text().strip(),
+            "keep_latest_exports": self.keep_exports_spin.value(),
+        }
+        self.start_worker("preview_exports", payload)
+
+    def archive_old_exports(self) -> None:
+        keep = self.keep_exports_spin.value()
+        ok = QMessageBox.question(
+            self,
+            "Archive old exports?",
+            "Thao tác này KHÔNG xoá file.\n\n"
+            f"Nó sẽ giữ lại {keep} folder mới nhất cho mỗi loại export,\n"
+            "còn folder cũ sẽ chuyển vào exports\\_archive.\n\n"
+            "Chạy tiếp?",
+        )
+
+        if ok != QMessageBox.StandardButton.Yes:
+            return
+
+        self.save_settings(show_popup=False)
+        payload = {
+            "project_root": self.project_edit.text().strip(),
+            "keep_latest_exports": keep,
+        }
+        self.start_worker("archive_exports", payload)
+
+    def open_archive_folder(self) -> None:
+        path = self.exports_dir() / "_archive"
+        path.mkdir(parents=True, exist_ok=True)
+        os.startfile(path)
+
+    def open_cleanup_reports(self) -> None:
+        path = self.exports_dir() / "_cleanup_reports"
+        path.mkdir(parents=True, exist_ok=True)
+        os.startfile(path)
+
     def set_live_status(self, running: bool) -> None:
         if running:
             self.live_status_label.setText("Live Manual: ON")
@@ -885,6 +964,16 @@ class STTAIEditorWindow(QMainWindow):
         self.append_log(str(result))
         self.set_running(False)
 
+        if "archive_count" in result:
+            self.cleanup_label.setText(f"Cleanup: {result.get('archive_count')} archive items")
+            self.cleanup_label.setStyleSheet("font-weight:700; color:#8ef0b0;")
+
+            report = result.get("report_json", "")
+            if report and Path(report).exists():
+                os.startfile(Path(report).parent)
+
+            return
+
         if self.auto_open_live_after_done:
             self.auto_open_live_after_done = False
             self.append_log("")
@@ -919,6 +1008,8 @@ class STTAIEditorWindow(QMainWindow):
         self.manual_export_btn.setDisabled(running)
         self.export_latest_manual_btn.setDisabled(running)
         self.export_latest_big_btn.setDisabled(running)
+        self.preview_cleanup_btn.setDisabled(running)
+        self.archive_cleanup_btn.setDisabled(running)
         self.status_label.setText("Running..." if running else "Ready")
         self.status_label.setStyleSheet(
             "font-weight:700; color:#ffd166;" if running else "font-weight:700; color:#8ef0b0;"
