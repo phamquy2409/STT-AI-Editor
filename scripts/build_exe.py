@@ -71,6 +71,7 @@ def build_exe(clean: bool = True) -> None:
         "core.gui.premiere_bridge_patch",
         "core.gui.premiere_xml_validator_patch",
         "core.gui.premiere_jsx_helper_patch",
+        "core.gui.premiere_script_installer_patch",
         "core.project",
         "core.pipeline",
         "core.pipeline_v2",
@@ -93,6 +94,7 @@ def build_exe(clean: bool = True) -> None:
         "core.premiere_bridge.bridge",
         "core.premiere_bridge.validator",
         "core.premiere_bridge.jsx_helper",
+        "core.premiere_bridge.script_installer",
     ]
 
     cmd = [
