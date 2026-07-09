@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import contextlib
 import os
+import signal
+import subprocess
 import sys
+import time
 import traceback
+import webbrowser
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
@@ -18,13 +22,13 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QMainWindow,
     QMessageBox,
     QPushButton,
     QPlainTextEdit,
     QSpinBox,
     QVBoxLayout,
     QWidget,
+    QMainWindow,
 )
 
 from core.exporter import export_premiere_xml_existing_project
@@ -44,6 +48,7 @@ class GuiDefaults:
     source_folder: str = "D:/5thang5test"
     target_duration: int = 60
     top_candidates: int = 120
+    live_manual_port: int = 8787
 
 
 class QtLogStream:
@@ -157,9 +162,10 @@ class STTAIEditorWindow(QMainWindow):
         self.worker_thread: QThread | None = None
         self.worker: Worker | None = None
         self.last_result: dict[str, Any] = {}
+        self.live_manual_process: subprocess.Popen | None = None
 
         self.setWindowTitle("STT AI Editor")
-        self.resize(1120, 850)
+        self.resize(1180, 900)
 
         self.projects_root_edit = QLineEdit(self.defaults.projects_root)
         self.project_name_edit = QLineEdit(self.defaults.project_name)
@@ -178,11 +184,18 @@ class STTAIEditorWindow(QMainWindow):
         self.candidate_spin.setRange(20, 1000)
         self.candidate_spin.setValue(self.defaults.top_candidates)
 
+        self.live_port_spin = QSpinBox()
+        self.live_port_spin.setRange(8000, 9999)
+        self.live_port_spin.setValue(self.defaults.live_manual_port)
+
         self.from_scratch_check = QCheckBox("Run from scratch: scan / detect / analyze lại")
         self.from_scratch_check.setChecked(False)
 
         self.status_label = QLabel("Ready")
         self.status_label.setStyleSheet("font-weight:700; color:#8ef0b0;")
+
+        self.live_status_label = QLabel("Live Manual: OFF")
+        self.live_status_label.setStyleSheet("font-weight:700; color:#aaaab2;")
 
         self.log_box = QPlainTextEdit()
         self.log_box.setReadOnly(True)
@@ -195,6 +208,7 @@ class STTAIEditorWindow(QMainWindow):
         layout.addWidget(self._build_create_project_box())
         layout.addWidget(self._build_active_project_box())
         layout.addWidget(self._build_action_box())
+        layout.addWidget(self._build_manual_live_box())
         layout.addWidget(self._build_open_box())
         layout.addWidget(QLabel("Log"))
         layout.addWidget(self.log_box, 1)
@@ -260,7 +274,7 @@ class STTAIEditorWindow(QMainWindow):
         return box
 
     def _build_action_box(self) -> QGroupBox:
-        box = QGroupBox("Run")
+        box = QGroupBox("Run Pipeline")
         row = QHBoxLayout(box)
 
         self.run_pipeline_btn = QPushButton("Run Pipeline Old")
@@ -270,10 +284,10 @@ class STTAIEditorWindow(QMainWindow):
         self.run_wedding_v2_btn.clicked.connect(self.run_wedding_pipeline_v2)
         self.run_wedding_v2_btn.setToolTip("Chạy pipeline mới: Wedding Scene → Story V2 → Remove Duplicate → XML")
 
-        self.manual_review_btn = QPushButton("Generate Manual Review")
+        self.manual_review_btn = QPushButton("Generate Manual Review Old")
         self.manual_review_btn.clicked.connect(self.generate_manual_review)
 
-        self.manual_export_btn = QPushButton("Export Manual XML")
+        self.manual_export_btn = QPushButton("Export Manual XML...")
         self.manual_export_btn.clicked.connect(self.export_manual_xml)
 
         row.addWidget(self.run_pipeline_btn)
@@ -282,6 +296,29 @@ class STTAIEditorWindow(QMainWindow):
         row.addWidget(self.manual_export_btn)
         row.addStretch(1)
         row.addWidget(self.status_label)
+
+        return box
+
+    def _build_manual_live_box(self) -> QGroupBox:
+        box = QGroupBox("Live Manual Review - Direct Save")
+        row = QHBoxLayout(box)
+
+        self.live_open_btn = QPushButton("Open Live Manual Review")
+        self.live_open_btn.clicked.connect(self.open_live_manual_review)
+
+        self.live_stop_btn = QPushButton("Stop Live Server")
+        self.live_stop_btn.clicked.connect(self.stop_live_manual_server)
+
+        self.export_latest_manual_btn = QPushButton("Export Latest Manual XML")
+        self.export_latest_manual_btn.clicked.connect(self.export_latest_manual_xml)
+
+        row.addWidget(QLabel("Port"))
+        row.addWidget(self.live_port_spin)
+        row.addWidget(self.live_open_btn)
+        row.addWidget(self.live_stop_btn)
+        row.addWidget(self.export_latest_manual_btn)
+        row.addStretch(1)
+        row.addWidget(self.live_status_label)
 
         return box
 
@@ -365,6 +402,9 @@ class STTAIEditorWindow(QMainWindow):
             color:#ffd166;
         }
         """)
+
+    def repo_root(self) -> Path:
+        return Path(__file__).resolve().parents[2]
 
     def choose_projects_root(self) -> None:
         folder = QFileDialog.getExistingDirectory(self, "Chọn Projects Root", self.projects_root_edit.text())
@@ -496,6 +536,117 @@ class STTAIEditorWindow(QMainWindow):
 
         self.start_worker("manual_export", payload)
 
+    def open_live_manual_review(self) -> None:
+        project_root = Path(self.project_edit.text().strip())
+        if not project_root.exists():
+            QMessageBox.warning(self, "Sai project", f"Không thấy project folder:\n{project_root}")
+            return
+
+        script = self.repo_root() / "scripts" / "run_live_manual_review.py"
+        if not script.exists():
+            QMessageBox.critical(
+                self,
+                "Thiếu Module 020",
+                f"Không thấy file:\n{script}\n\nCài Module 020 trước, hoặc copy lại file run_live_manual_review.py.",
+            )
+            return
+
+        port = int(self.live_port_spin.value())
+        url = f"http://127.0.0.1:{port}"
+
+        if self.live_manual_process and self.live_manual_process.poll() is None:
+            self.append_log(f"Live Manual server đang chạy. Mở lại: {url}")
+            webbrowser.open(url)
+            return
+
+        cmd = [sys.executable, str(script), "--port", str(port)]
+
+        creationflags = 0
+        if os.name == "nt":
+            creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
+
+        try:
+            self.live_manual_process = subprocess.Popen(
+                cmd,
+                cwd=str(self.repo_root()),
+                creationflags=creationflags,
+            )
+
+            time.sleep(0.8)
+            self.append_log("")
+            self.append_log("LIVE MANUAL REVIEW SERVER STARTED")
+            self.append_log(f"PID: {self.live_manual_process.pid}")
+            self.append_log(f"URL: {url}")
+            self.append_log("Sau khi KEEP/REJECT xong, bấm Save to Project Folder trong browser.")
+            self.append_log("Sau đó quay lại GUI bấm Export Latest Manual XML.")
+            self.set_live_status(True)
+            webbrowser.open(url)
+
+        except Exception:
+            QMessageBox.critical(self, "Không mở được Live Manual Review", traceback.format_exc())
+            self.append_log("LIVE MANUAL SERVER ERROR")
+            self.append_log(traceback.format_exc())
+            self.set_live_status(False)
+
+    def stop_live_manual_server(self) -> None:
+        proc = self.live_manual_process
+
+        if not proc or proc.poll() is not None:
+            self.append_log("Live Manual server hiện không chạy.")
+            self.set_live_status(False)
+            return
+
+        try:
+            if os.name == "nt":
+                # Terminate is safer inside GUI. The saved json is already written before this step.
+                proc.terminate()
+            else:
+                proc.send_signal(signal.SIGTERM)
+
+            try:
+                proc.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+
+            self.append_log("LIVE MANUAL REVIEW SERVER STOPPED")
+            self.set_live_status(False)
+
+        except Exception:
+            self.append_log("STOP LIVE SERVER ERROR")
+            self.append_log(traceback.format_exc())
+            QMessageBox.critical(self, "Không tắt được server", traceback.format_exc())
+
+    def export_latest_manual_xml(self) -> None:
+        project_root = Path(self.project_edit.text().strip())
+        selection_json = project_root / "manual_selection.json"
+
+        if not selection_json.exists():
+            QMessageBox.warning(
+                self,
+                "Chưa thấy manual_selection.json",
+                "Chưa thấy file:\n"
+                f"{selection_json}\n\n"
+                "Mở Live Manual Review → KEEP/REJECT → bấm Save to Project Folder trước.",
+            )
+            return
+
+        payload = {
+            "project_root": str(project_root),
+            "selection_json": str(selection_json),
+        }
+
+        self.append_log("")
+        self.append_log(f"Using latest manual selection: {selection_json}")
+        self.start_worker("manual_export", payload)
+
+    def set_live_status(self, running: bool) -> None:
+        if running:
+            self.live_status_label.setText("Live Manual: ON")
+            self.live_status_label.setStyleSheet("font-weight:700; color:#8ef0b0;")
+        else:
+            self.live_status_label.setText("Live Manual: OFF")
+            self.live_status_label.setStyleSheet("font-weight:700; color:#aaaab2;")
+
     def start_worker(self, action: str, payload: dict[str, Any]) -> None:
         project = Path(payload.get("project_root", ""))
         if not project.exists():
@@ -550,6 +701,7 @@ class STTAIEditorWindow(QMainWindow):
         self.run_wedding_v2_btn.setDisabled(running)
         self.manual_review_btn.setDisabled(running)
         self.manual_export_btn.setDisabled(running)
+        self.export_latest_manual_btn.setDisabled(running)
         self.status_label.setText("Running..." if running else "Ready")
         self.status_label.setStyleSheet(
             "font-weight:700; color:#ffd166;" if running else "font-weight:700; color:#8ef0b0;"
@@ -607,6 +759,15 @@ class STTAIEditorWindow(QMainWindow):
             return
 
         os.startfile(files[0].parent)
+
+    def closeEvent(self, event) -> None:
+        # Stop live server when closing GUI so the port is not left running.
+        if self.live_manual_process and self.live_manual_process.poll() is None:
+            try:
+                self.live_manual_process.terminate()
+            except Exception:
+                pass
+        super().closeEvent(event)
 
 
 def run_gui() -> None:
