@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
-from PySide6.QtCore import QObject, Qt, QThread, Signal
+from PySide6.QtCore import QObject, QThread, Signal
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -31,6 +31,7 @@ from core.exporter import export_premiere_xml_existing_project
 from core.manual_export import build_manual_selection_existing_project
 from core.manual_review import generate_manual_review_existing_project
 from core.pipeline import run_one_click_pipeline_existing_project
+from core.pipeline_v2 import run_wedding_pipeline_v2_existing_project
 from core.project import ProjectManager
 from core.review import generate_preview_review_existing_project
 
@@ -103,6 +104,13 @@ class Worker(QObject):
                 top_candidates=int(self.payload.get("top_candidates", 120)),
             )
 
+        if self.action == "wedding_pipeline_v2":
+            return run_wedding_pipeline_v2_existing_project(
+                project_root=project_root,
+                target_duration_seconds=float(self.payload.get("target_duration", 60)),
+                max_segments_per_video=int(self.payload.get("max_segments_per_video", 1)),
+            )
+
         if self.action == "manual_review":
             return generate_manual_review_existing_project(project_root=project_root, input_json=None)
 
@@ -151,15 +159,13 @@ class STTAIEditorWindow(QMainWindow):
         self.last_result: dict[str, Any] = {}
 
         self.setWindowTitle("STT AI Editor")
-        self.resize(1100, 820)
+        self.resize(1120, 850)
 
-        # Project creator fields
         self.projects_root_edit = QLineEdit(self.defaults.projects_root)
         self.project_name_edit = QLineEdit(self.defaults.project_name)
         self.overwrite_project_check = QCheckBox("Overwrite nếu project đã tồn tại")
         self.overwrite_project_check.setChecked(False)
 
-        # Active project fields
         self.project_edit = QLineEdit(self.defaults.project_root)
         self.source_edit = QLineEdit(self.defaults.source_folder)
 
@@ -257,8 +263,12 @@ class STTAIEditorWindow(QMainWindow):
         box = QGroupBox("Run")
         row = QHBoxLayout(box)
 
-        self.run_pipeline_btn = QPushButton("Run Pipeline")
+        self.run_pipeline_btn = QPushButton("Run Pipeline Old")
         self.run_pipeline_btn.clicked.connect(self.run_pipeline)
+
+        self.run_wedding_v2_btn = QPushButton("Run Wedding Pipeline V2")
+        self.run_wedding_v2_btn.clicked.connect(self.run_wedding_pipeline_v2)
+        self.run_wedding_v2_btn.setToolTip("Chạy pipeline mới: Wedding Scene → Story V2 → Remove Duplicate → XML")
 
         self.manual_review_btn = QPushButton("Generate Manual Review")
         self.manual_review_btn.clicked.connect(self.generate_manual_review)
@@ -267,6 +277,7 @@ class STTAIEditorWindow(QMainWindow):
         self.manual_export_btn.clicked.connect(self.export_manual_xml)
 
         row.addWidget(self.run_pipeline_btn)
+        row.addWidget(self.run_wedding_v2_btn)
         row.addWidget(self.manual_review_btn)
         row.addWidget(self.manual_export_btn)
         row.addStretch(1)
@@ -421,7 +432,7 @@ class STTAIEditorWindow(QMainWindow):
                 f"Đã tạo project:\n{project.root}\n\nProject này đã được set làm Active Project.",
             )
 
-        except Exception as exc:
+        except Exception:
             QMessageBox.critical(self, "Create project error", traceback.format_exc())
             self.append_log("CREATE PROJECT ERROR")
             self.append_log(traceback.format_exc())
@@ -446,12 +457,28 @@ class STTAIEditorWindow(QMainWindow):
 
         self.start_worker("pipeline", payload)
 
+    def run_wedding_pipeline_v2(self) -> None:
+        # Wedding Pipeline V2 does not rescan/re-analyze. It uses existing analyzed/candidate data.
+        payload = {
+            "project_root": self.project_edit.text().strip(),
+            "target_duration": self.duration_spin.value(),
+            "max_segments_per_video": 1,
+        }
+
+        self.start_worker("wedding_pipeline_v2", payload)
+
     def generate_manual_review(self) -> None:
         payload = {"project_root": self.project_edit.text().strip()}
         self.start_worker("manual_review", payload)
 
     def export_manual_xml(self) -> None:
         default_dir = str(Path.home() / "Downloads")
+        project_root = Path(self.project_edit.text().strip())
+        alias_json = project_root / "manual_selection.json"
+
+        if alias_json.exists():
+            default_dir = str(project_root)
+
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Chọn manual_selection.json",
@@ -520,6 +547,7 @@ class STTAIEditorWindow(QMainWindow):
 
     def set_running(self, running: bool) -> None:
         self.run_pipeline_btn.setDisabled(running)
+        self.run_wedding_v2_btn.setDisabled(running)
         self.manual_review_btn.setDisabled(running)
         self.manual_export_btn.setDisabled(running)
         self.status_label.setText("Running..." if running else "Ready")
