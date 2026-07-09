@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import json
 import os
 import signal
 import subprocess
@@ -8,7 +9,7 @@ import sys
 import time
 import traceback
 import webbrowser
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Any, Callable
 
@@ -49,6 +50,70 @@ class GuiDefaults:
     target_duration: int = 60
     top_candidates: int = 120
     live_manual_port: int = 8787
+    window_width: int = 1220
+    window_height: int = 930
+
+
+class GuiSettingsStore:
+    # Build 028.
+    # Saves GUI settings so the app remembers last project/source/duration/port.
+    #
+    # Windows path:
+    # %APPDATA%\STT_AI_Editor\gui_settings.json
+    #
+    # Fallback:
+    # <repo>\.stt_ai_editor\gui_settings.json
+
+    def __init__(self, repo_root: Path) -> None:
+        self.repo_root = repo_root
+        appdata = os.environ.get("APPDATA", "").strip()
+
+        if appdata:
+            self.path = Path(appdata) / "STT_AI_Editor" / "gui_settings.json"
+        else:
+            self.path = repo_root / ".stt_ai_editor" / "gui_settings.json"
+
+    def load(self, defaults: GuiDefaults) -> GuiDefaults:
+        data = asdict(defaults)
+
+        if not self.path.exists():
+            return defaults
+
+        try:
+            payload = json.loads(self.path.read_text(encoding="utf-8"))
+            if not isinstance(payload, dict):
+                return defaults
+
+            for key in data.keys():
+                if key in payload and payload[key] is not None:
+                    data[key] = payload[key]
+
+            return GuiDefaults(
+                projects_root=str(data["projects_root"]),
+                project_name=str(data["project_name"]),
+                project_root=str(data["project_root"]),
+                source_folder=str(data["source_folder"]),
+                target_duration=int(data["target_duration"]),
+                top_candidates=int(data["top_candidates"]),
+                live_manual_port=int(data["live_manual_port"]),
+                window_width=int(data["window_width"]),
+                window_height=int(data["window_height"]),
+            )
+
+        except Exception:
+            return defaults
+
+    def save(self, values: dict[str, Any]) -> Path:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(
+            json.dumps(values, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        return self.path
+
+    def reset(self) -> None:
+        if self.path.exists():
+            self.path.unlink()
 
 
 class QtLogStream:
@@ -158,7 +223,10 @@ class STTAIEditorWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
 
-        self.defaults = GuiDefaults()
+        hard_defaults = GuiDefaults()
+        self.settings_store = GuiSettingsStore(self.repo_root_static())
+        self.defaults = self.settings_store.load(hard_defaults)
+
         self.worker_thread: QThread | None = None
         self.worker: Worker | None = None
         self.last_result: dict[str, Any] = {}
@@ -166,7 +234,7 @@ class STTAIEditorWindow(QMainWindow):
         self.auto_open_live_after_done = False
 
         self.setWindowTitle("STT AI Editor")
-        self.resize(1220, 930)
+        self.resize(self.defaults.window_width, self.defaults.window_height)
 
         self.projects_root_edit = QLineEdit(self.defaults.projects_root)
         self.project_name_edit = QLineEdit(self.defaults.project_name)
@@ -201,6 +269,9 @@ class STTAIEditorWindow(QMainWindow):
         self.workflow_label = QLabel("Workflow: Run Final V2 → KEEP/REJECT → Save → Export Latest XML")
         self.workflow_label.setStyleSheet("font-weight:700; color:#ffd166;")
 
+        self.settings_label = QLabel("Settings: loaded")
+        self.settings_label.setStyleSheet("font-weight:700; color:#8fd3ff;")
+
         self.log_box = QPlainTextEdit()
         self.log_box.setReadOnly(True)
         self.log_box.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
@@ -214,11 +285,22 @@ class STTAIEditorWindow(QMainWindow):
         layout.addWidget(self._build_final_workflow_box())
         layout.addWidget(self._build_action_box())
         layout.addWidget(self._build_manual_live_box())
+        layout.addWidget(self._build_settings_box())
         layout.addWidget(self._build_open_box())
         layout.addWidget(QLabel("Log"))
         layout.addWidget(self.log_box, 1)
 
+        self._connect_auto_settings()
         self._apply_style()
+
+        self.append_log("GUI SETTINGS LOADED")
+        self.append_log(f"Settings file: {self.settings_store.path}")
+        self.append_log(f"Project: {self.project_edit.text().strip()}")
+        self.append_log(f"Source: {self.source_edit.text().strip()}")
+
+    @staticmethod
+    def repo_root_static() -> Path:
+        return Path(__file__).resolve().parents[2]
 
     def _build_create_project_box(self) -> QGroupBox:
         box = QGroupBox("Create / Open Project")
@@ -348,6 +430,27 @@ class STTAIEditorWindow(QMainWindow):
 
         return box
 
+    def _build_settings_box(self) -> QGroupBox:
+        box = QGroupBox("Settings")
+        row = QHBoxLayout(box)
+
+        save_btn = QPushButton("Save Settings")
+        save_btn.clicked.connect(lambda: self.save_settings(show_popup=True))
+
+        reset_btn = QPushButton("Reset Settings")
+        reset_btn.clicked.connect(self.reset_settings)
+
+        open_settings_btn = QPushButton("Open Settings Folder")
+        open_settings_btn.clicked.connect(self.open_settings_folder)
+
+        row.addWidget(save_btn)
+        row.addWidget(reset_btn)
+        row.addWidget(open_settings_btn)
+        row.addStretch(1)
+        row.addWidget(self.settings_label)
+
+        return box
+
     def _build_open_box(self) -> QGroupBox:
         box = QGroupBox("Open")
         row = QHBoxLayout(box)
@@ -379,6 +482,15 @@ class STTAIEditorWindow(QMainWindow):
         row.addWidget(btn_clear)
 
         return box
+
+    def _connect_auto_settings(self) -> None:
+        self.projects_root_edit.editingFinished.connect(lambda: self.save_settings(show_popup=False))
+        self.project_name_edit.editingFinished.connect(lambda: self.save_settings(show_popup=False))
+        self.project_edit.editingFinished.connect(lambda: self.save_settings(show_popup=False))
+        self.source_edit.editingFinished.connect(lambda: self.save_settings(show_popup=False))
+        self.duration_spin.valueChanged.connect(lambda _: self.save_settings(show_popup=False))
+        self.candidate_spin.valueChanged.connect(lambda _: self.save_settings(show_popup=False))
+        self.live_port_spin.valueChanged.connect(lambda _: self.save_settings(show_popup=False))
 
     def _apply_style(self) -> None:
         self.setStyleSheet("""
@@ -432,20 +544,72 @@ class STTAIEditorWindow(QMainWindow):
     def repo_root(self) -> Path:
         return Path(__file__).resolve().parents[2]
 
+    def current_settings_dict(self) -> dict[str, Any]:
+        size = self.size()
+        return {
+            "projects_root": self.projects_root_edit.text().strip(),
+            "project_name": self.project_name_edit.text().strip(),
+            "project_root": self.project_edit.text().strip(),
+            "source_folder": self.source_edit.text().strip(),
+            "target_duration": int(self.duration_spin.value()),
+            "top_candidates": int(self.candidate_spin.value()),
+            "live_manual_port": int(self.live_port_spin.value()),
+            "window_width": int(size.width()),
+            "window_height": int(size.height()),
+        }
+
+    def save_settings(self, show_popup: bool = False) -> None:
+        try:
+            path = self.settings_store.save(self.current_settings_dict())
+            self.settings_label.setText("Settings: saved")
+            self.settings_label.setStyleSheet("font-weight:700; color:#8ef0b0;")
+
+            if show_popup:
+                QMessageBox.information(self, "Saved", f"Đã lưu settings:\n{path}")
+
+        except Exception:
+            self.settings_label.setText("Settings: save error")
+            self.settings_label.setStyleSheet("font-weight:700; color:#ff6b6b;")
+            if show_popup:
+                QMessageBox.critical(self, "Save settings error", traceback.format_exc())
+
+    def reset_settings(self) -> None:
+        ok = QMessageBox.question(
+            self,
+            "Reset settings?",
+            "Xoá settings đã lưu và quay về mặc định ở lần mở app sau?",
+        )
+
+        if ok != QMessageBox.StandardButton.Yes:
+            return
+
+        self.settings_store.reset()
+        self.settings_label.setText("Settings: reset")
+        self.settings_label.setStyleSheet("font-weight:700; color:#ffd166;")
+        QMessageBox.information(self, "Reset done", "Đã xoá settings. Đóng app và mở lại để về mặc định.")
+
+    def open_settings_folder(self) -> None:
+        folder = self.settings_store.path.parent
+        folder.mkdir(parents=True, exist_ok=True)
+        os.startfile(folder)
+
     def choose_projects_root(self) -> None:
         folder = QFileDialog.getExistingDirectory(self, "Chọn Projects Root", self.projects_root_edit.text())
         if folder:
             self.projects_root_edit.setText(folder)
+            self.save_settings(show_popup=False)
 
     def choose_project(self) -> None:
         folder = QFileDialog.getExistingDirectory(self, "Chọn Project Folder", self.project_edit.text())
         if folder:
             self.project_edit.setText(folder)
+            self.save_settings(show_popup=False)
 
     def choose_source(self) -> None:
         folder = QFileDialog.getExistingDirectory(self, "Chọn Source Folder", self.source_edit.text())
         if folder:
             self.source_edit.setText(folder)
+            self.save_settings(show_popup=False)
 
     def create_new_project(self) -> None:
         projects_root = Path(self.projects_root_edit.text().strip())
@@ -486,6 +650,8 @@ class STTAIEditorWindow(QMainWindow):
             if source_folder:
                 self.source_edit.setText(str(source_folder).replace("\\", "/"))
 
+            self.save_settings(show_popup=False)
+
             self.append_log("")
             self.append_log("PROJECT CREATED")
             self.append_log(f"Name: {project.name}")
@@ -504,6 +670,7 @@ class STTAIEditorWindow(QMainWindow):
             self.append_log(traceback.format_exc())
 
     def run_final_wedding_v2_workflow(self) -> None:
+        self.save_settings(show_popup=False)
         self.auto_open_live_after_done = True
         self.append_log("")
         self.append_log("FINAL WORKFLOW START")
@@ -523,6 +690,8 @@ class STTAIEditorWindow(QMainWindow):
             if ok != QMessageBox.StandardButton.Yes:
                 return
 
+        self.save_settings(show_popup=False)
+
         payload = {
             "project_root": self.project_edit.text().strip(),
             "source_folder": self.source_edit.text().strip(),
@@ -534,7 +703,8 @@ class STTAIEditorWindow(QMainWindow):
         self.start_worker("pipeline", payload)
 
     def run_wedding_pipeline_v2(self) -> None:
-        # Wedding Pipeline V2 does not rescan/re-analyze. It uses existing analyzed/candidate data.
+        self.save_settings(show_popup=False)
+
         payload = {
             "project_root": self.project_edit.text().strip(),
             "target_duration": self.duration_spin.value(),
@@ -573,6 +743,8 @@ class STTAIEditorWindow(QMainWindow):
         self.start_worker("manual_export", payload)
 
     def open_live_manual_review(self) -> None:
+        self.save_settings(show_popup=False)
+
         project_root = Path(self.project_edit.text().strip())
         if not project_root.exists():
             QMessageBox.warning(self, "Sai project", f"Không thấy project folder:\n{project_root}")
@@ -806,11 +978,14 @@ class STTAIEditorWindow(QMainWindow):
         os.startfile(files[0].parent)
 
     def closeEvent(self, event) -> None:
+        self.save_settings(show_popup=False)
+
         if self.live_manual_process and self.live_manual_process.poll() is None:
             try:
                 self.live_manual_process.terminate()
             except Exception:
                 pass
+
         super().closeEvent(event)
 
 
