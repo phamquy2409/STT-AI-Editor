@@ -20,7 +20,7 @@ def main() -> None:
         project_root=project_root,
         input_json=None,
         target_duration_seconds=60.0,
-        max_segments_per_video=2,
+        max_segments_per_video=1,
     )
 
     xml = export_premiere_xml_existing_project(
@@ -37,7 +37,7 @@ def main() -> None:
     )
 
     print()
-    print("STORY TIMELINE FILES:")
+    print("STORY TIMELINE STRONG DIVERSITY FILES:")
     for name, path in story.items():
         print(f"{name}: {path}")
 
