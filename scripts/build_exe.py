@@ -31,12 +31,24 @@ def ensure_pyinstaller(repo_root: Path) -> None:
     run([sys.executable, "-m", "pip", "install", "pyinstaller"], cwd=repo_root)
 
 
+def add_data_arg(src: Path, dst: str) -> str:
+    # PyInstaller uses ";" on Windows and ":" on macOS/Linux.
+    return f"{src}{os.pathsep}{dst}"
+
+
 def build_exe(clean: bool = True) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     entry = repo_root / "scripts" / "run_gui.py"
+    live_script = repo_root / "scripts" / "run_live_manual_review.py"
 
     if not entry.exists():
         raise FileNotFoundError(f"Missing GUI entry: {entry}")
+
+    if not live_script.exists():
+        raise FileNotFoundError(
+            f"Missing live review script: {live_script}\n"
+            "Install Module 020/031 first."
+        )
 
     ensure_pyinstaller(repo_root)
 
@@ -51,12 +63,6 @@ def build_exe(clean: bool = True) -> None:
                 print(f"Removing spec: {spec}")
                 spec.unlink(missing_ok=True)
 
-    # PyInstaller output:
-    # dist/STT AI Editor/STT AI Editor.exe
-    #
-    # one-folder mode is safer than one-file for PySide6/OpenCV.
-    # Start with one-folder. We can test one-file later if this is stable.
-
     cmd = [
         sys.executable,
         "-m",
@@ -68,11 +74,12 @@ def build_exe(clean: bool = True) -> None:
         "--name",
         APP_NAME,
 
-        # PySide6 can need collect-all depending on environment.
+        "--add-data",
+        add_data_arg(live_script, "scripts"),
+
         "--collect-all",
         "PySide6",
 
-        # OpenCV / numpy / sqlalchemy helpers.
         "--hidden-import",
         "cv2",
         "--hidden-import",
@@ -82,9 +89,12 @@ def build_exe(clean: bool = True) -> None:
         "--hidden-import",
         "ffmpeg",
 
-        # Project modules that may be imported dynamically.
         "--hidden-import",
         "core.gui",
+        "--hidden-import",
+        "core.gui.exe_live_patch",
+        "--hidden-import",
+        "core.gui.production_patch",
         "--hidden-import",
         "core.project",
         "--hidden-import",
@@ -106,6 +116,8 @@ def build_exe(clean: bool = True) -> None:
         "--hidden-import",
         "core.manual_live",
         "--hidden-import",
+        "core.manual_live.live_review_server",
+        "--hidden-import",
         "core.manual_export",
         "--hidden-import",
         "core.exporter",
@@ -115,6 +127,10 @@ def build_exe(clean: bool = True) -> None:
         "core.project_presets",
         "--hidden-import",
         "core.export_cleaner",
+        "--hidden-import",
+        "core.app_health",
+        "--hidden-import",
+        "core.app_health.health",
 
         str(entry),
     ]
@@ -122,6 +138,7 @@ def build_exe(clean: bool = True) -> None:
     run(cmd, cwd=repo_root)
 
     exe_path = repo_root / "dist" / APP_NAME / f"{APP_NAME}.exe"
+    bundled_live_script = repo_root / "dist" / APP_NAME / "_internal" / "scripts" / "run_live_manual_review.py"
 
     print()
     print("=" * 80)
@@ -129,8 +146,17 @@ def build_exe(clean: bool = True) -> None:
     print("=" * 80)
 
     if exe_path.exists():
-        print(f"EXE:")
+        print("EXE:")
         print(exe_path)
+        print()
+
+        if bundled_live_script.exists():
+            print("Live Review script bundled OK:")
+            print(bundled_live_script)
+        else:
+            print("WARNING: Live Review script missing, but Module 034C can run live server in-process:")
+            print(bundled_live_script)
+
         print()
         print("Run test:")
         print(f'& "{exe_path}"')
