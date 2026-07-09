@@ -96,6 +96,8 @@ def build_exe(clean: bool = True) -> None:
         "--hidden-import",
         "core.gui.production_patch",
         "--hidden-import",
+        "core.gui.premiere_bridge_patch",
+        "--hidden-import",
         "core.project",
         "--hidden-import",
         "core.pipeline",
@@ -131,6 +133,10 @@ def build_exe(clean: bool = True) -> None:
         "core.app_health",
         "--hidden-import",
         "core.app_health.health",
+        "--hidden-import",
+        "core.premiere_bridge",
+        "--hidden-import",
+        "core.premiere_bridge.bridge",
 
         str(entry),
     ]
