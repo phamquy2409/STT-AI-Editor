@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from .bridge import PremiereBridgeExporter
+from .pointer import PremiereXMLPointer
 
 
 DEFAULT_PROJECT_ROOT = "D:/STT Projects/Wedding_Test_001"
@@ -26,34 +27,20 @@ class PremierePanelInstallerConfig:
 
 
 class PremierePanelInstaller:
-    # Module 041.
-    # Creates a CEP Premiere panel starter package.
-    #
-    # This is the first real Premiere panel step.
-    # It creates:
-    # - CEP extension folder
-    # - manifest.xml
-    # - index.html UI
-    # - JS bridge using CSInterface
-    # - ExtendScript host.jsx
-    # - installer BAT to copy into %APPDATA%/Adobe/CEP/extensions
-    # - enable debug BAT for unsigned CEP extensions
-    #
-    # The panel reads the latest XML pointer written by Module 040:
-    # %APPDATA%/STT_AI_Editor/premiere_latest_xml.txt
+    # Module 042 upgrades Module 041 panel:
+    # - Better UI/status
+    # - Reads JSON pointer if available
+    # - More useful buttons
+    # - Clear warning when XML pointer is missing
+    # - Update pointer before creating/installing panel
 
     def __init__(self, project_root: str | Path = DEFAULT_PROJECT_ROOT) -> None:
         self.project_root = Path(project_root)
         self.exports_dir = self.project_root / "exports"
-        self.appdata_dir = self.get_appdata_dir()
-        self.latest_xml_pointer = self.appdata_dir / "premiere_latest_xml.txt"
-
-    @staticmethod
-    def get_appdata_dir() -> Path:
-        appdata = os.environ.get("APPDATA")
-        if appdata:
-            return Path(appdata) / "STT_AI_Editor"
-        return Path.home() / "AppData" / "Roaming" / "STT_AI_Editor"
+        self.pointer = PremiereXMLPointer(project_root=self.project_root)
+        self.appdata_dir = self.pointer.appdata_dir
+        self.latest_xml_pointer = self.pointer.pointer_txt
+        self.latest_xml_pointer_json = self.pointer.pointer_json
 
     @staticmethod
     def get_user_cep_extensions_dir() -> Path:
@@ -76,8 +63,7 @@ class PremierePanelInstaller:
                 "Hãy bấm Export Latest Manual XML hoặc Premiere Bridge Package trước."
             )
 
-        self.appdata_dir.mkdir(parents=True, exist_ok=True)
-        self.latest_xml_pointer.write_text(str(xml), encoding="utf-8")
+        pointer_data = self.pointer.update(xml_path=xml, source="module_042_panel_installer")
 
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         out_dir = self.exports_dir / f"premiere_panel_starter_{stamp}"
@@ -97,11 +83,11 @@ class PremierePanelInstaller:
         uninstall_bat = out_dir / "UNINSTALL_PANEL_FROM_USER_CEP.bat"
         uninstall_bat.write_text(self.render_uninstall_bat(), encoding="utf-8")
 
-        copy_pointer_bat = out_dir / "Update_Latest_XML_Pointer.bat"
-        copy_pointer_bat.write_text(
+        update_pointer_bat = out_dir / "Update_Latest_XML_Pointer.bat"
+        update_pointer_bat.write_text(
             f'@echo off\n'
             f'if not exist "%APPDATA%\\STT_AI_Editor" mkdir "%APPDATA%\\STT_AI_Editor"\n'
-            f'echo {xml}> "%APPDATA%\\STT_AI_Editor\\premiere_latest_xml.txt"\n'
+            f'echo {xml.resolve()}> "%APPDATA%\\STT_AI_Editor\\premiere_latest_xml.txt"\n'
             f'echo Latest XML pointer updated:\n'
             f'type "%APPDATA%\\STT_AI_Editor\\premiere_latest_xml.txt"\n'
             f'pause\n',
@@ -119,10 +105,12 @@ class PremierePanelInstaller:
 
         manifest = {
             "created_at": datetime.now().isoformat(timespec="seconds"),
-            "module": "041_premiere_panel_starter",
+            "module": "042_premiere_panel_polish_pointer",
             "project_root": str(self.project_root),
-            "xml": str(xml),
+            "xml": str(xml.resolve()),
             "latest_xml_pointer": str(self.latest_xml_pointer),
+            "latest_xml_pointer_json": str(self.latest_xml_pointer_json),
+            "pointer_data": pointer_data,
             "package_dir": str(out_dir),
             "extension_id": EXTENSION_ID,
             "extension_dir": str(extension_dir),
@@ -139,8 +127,9 @@ class PremierePanelInstaller:
         result = {
             "ok": True,
             "project_root": str(self.project_root),
-            "xml": str(xml),
+            "xml": str(xml.resolve()),
             "latest_xml_pointer": str(self.latest_xml_pointer),
+            "latest_xml_pointer_json": str(self.latest_xml_pointer_json),
             "package_dir": str(out_dir),
             "extension_dir": str(extension_dir),
             "installed_to_user_cep": str(installed_to) if installed_to else None,
@@ -192,7 +181,6 @@ class PremierePanelInstaller:
 
     @staticmethod
     def render_manifest_xml() -> str:
-        # Host version range is intentionally broad for Premiere Pro.
         return f'''<?xml version="1.0" encoding="UTF-8"?>
 <ExtensionManifest Version="7.0" ExtensionBundleId="{EXTENSION_ID}" ExtensionBundleVersion="1.0.0" ExtensionBundleName="{EXTENSION_NAME}" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <ExtensionList>
@@ -228,12 +216,12 @@ class PremierePanelInstaller:
           <Menu>{EXTENSION_NAME}</Menu>
           <Geometry>
             <Size>
-              <Height>560</Height>
-              <Width>380</Width>
+              <Height>620</Height>
+              <Width>420</Width>
             </Size>
             <MinSize>
-              <Height>420</Height>
-              <Width>320</Width>
+              <Height>460</Height>
+              <Width>340</Width>
             </MinSize>
           </Geometry>
         </UI>
@@ -256,17 +244,33 @@ class PremierePanelInstaller:
 </head>
 <body>
   <div class="wrap">
-    <div class="badge">STT AI Editor</div>
+    <div class="top">
+      <div class="badge">STT AI Editor</div>
+      <div id="dot" class="dot wait"></div>
+    </div>
+
     <h1>Premiere Panel</h1>
-    <p class="muted">Module 041 - panel starter</p>
+    <p class="muted">Module 042 - polished panel + auto XML pointer</p>
 
     <button id="btnRefresh">Refresh Latest XML</button>
     <button id="btnImport" class="primary">Import Latest XML</button>
     <button id="btnOpenFolder">Open XML Folder</button>
+    <button id="btnRevealProject">Reveal in Project Panel</button>
 
     <div class="box">
       <div class="label">Latest XML</div>
       <div id="xmlPath" class="path">Loading...</div>
+    </div>
+
+    <div class="box grid">
+      <div>
+        <div class="label">Exists</div>
+        <div id="xmlExists">-</div>
+      </div>
+      <div>
+        <div class="label">Updated</div>
+        <div id="xmlUpdated">-</div>
+      </div>
     </div>
 
     <div class="box">
@@ -284,18 +288,30 @@ class PremierePanelInstaller:
 
     @staticmethod
     def render_main_js() -> str:
-        return r'''/* STT AI Editor - CEP Panel main.js */
+        return r'''/* STT AI Editor - CEP Panel main.js - Module 042 */
 
 var csInterface = null;
+var lastXML = "";
+
+function el(id) {
+  return document.getElementById(id);
+}
 
 function setText(id, text) {
-  var el = document.getElementById(id);
-  if (el) el.textContent = text;
+  var node = el(id);
+  if (node) node.textContent = text;
+}
+
+function setDot(state) {
+  var dot = el("dot");
+  if (!dot) return;
+  dot.className = "dot " + state;
 }
 
 function evalHost(script, cb) {
   if (!csInterface) {
     setText("status", "CSInterface chưa sẵn sàng.");
+    setDot("bad");
     if (cb) cb("");
     return;
   }
@@ -305,18 +321,46 @@ function evalHost(script, cb) {
   });
 }
 
+function parseMaybeJSON(res) {
+  try {
+    return JSON.parse(res);
+  } catch (e) {
+    return null;
+  }
+}
+
 function refreshLatestXML() {
   setText("status", "Reading latest XML...");
-  evalHost("sttGetLatestXMLPath()", function (res) {
-    setText("xmlPath", res || "Không thấy latest XML pointer.");
-    setText("status", res ? "Latest XML loaded." : "No XML found.");
+  setDot("wait");
+
+  evalHost("sttGetLatestXMLInfo()", function (res) {
+    var data = parseMaybeJSON(res);
+
+    if (!data) {
+      setText("xmlPath", res || "Không thấy latest XML pointer.");
+      setText("xmlExists", "-");
+      setText("xmlUpdated", "-");
+      setText("status", res ? "Loaded text pointer." : "No XML found.");
+      setDot(res ? "ok" : "bad");
+      return;
+    }
+
+    lastXML = data.xml || "";
+    setText("xmlPath", lastXML || "Không thấy XML.");
+    setText("xmlExists", data.exists ? "YES" : "NO");
+    setText("xmlUpdated", data.updated_at || "-");
+    setText("status", data.status || "Ready");
+    setDot(data.exists ? "ok" : "bad");
   });
 }
 
 function importLatestXML() {
   setText("status", "Importing XML...");
+  setDot("wait");
+
   evalHost("sttImportLatestXML()", function (res) {
     setText("status", res || "Done.");
+    setDot("ok");
     refreshLatestXML();
   });
 }
@@ -328,16 +372,25 @@ function openLatestXMLFolder() {
   });
 }
 
+function revealProjectPanel() {
+  setText("status", "Tip: Check Project panel for imported sequence.");
+  evalHost("sttProjectPanelTip()", function (res) {
+    setText("status", res || "Check Project panel.");
+  });
+}
+
 window.onload = function () {
   try {
     csInterface = new CSInterface();
   } catch (e) {
     setText("status", "CSInterface lỗi: " + e);
+    setDot("bad");
   }
 
-  document.getElementById("btnRefresh").onclick = refreshLatestXML;
-  document.getElementById("btnImport").onclick = importLatestXML;
-  document.getElementById("btnOpenFolder").onclick = openLatestXMLFolder;
+  el("btnRefresh").onclick = refreshLatestXML;
+  el("btnImport").onclick = importLatestXML;
+  el("btnOpenFolder").onclick = openLatestXMLFolder;
+  el("btnRevealProject").onclick = revealProjectPanel;
 
   refreshLatestXML();
 };
@@ -347,10 +400,7 @@ window.onload = function () {
     def render_host_jsx() -> str:
         return r'''/*
 STT AI Editor - Premiere CEP Panel host.jsx
-Module 041
-
-Reads latest XML pointer:
-Folder.userData/STT_AI_Editor/premiere_latest_xml.txt
+Module 042
 */
 
 function sttTrimText(s) {
@@ -361,24 +411,65 @@ function sttPointerFile() {
     return new File(Folder.userData.fsName + "/STT_AI_Editor/premiere_latest_xml.txt");
 }
 
+function sttPointerJsonFile() {
+    return new File(Folder.userData.fsName + "/STT_AI_Editor/premiere_latest_xml.json");
+}
+
+function sttEscapeJSON(s) {
+    return String(s)
+        .replace(/\\/g, "\\\\")
+        .replace(/"/g, "\\\"")
+        .replace(/\r/g, "\\r")
+        .replace(/\n/g, "\\n");
+}
+
+function sttReadTextFile(f) {
+    if (!f.exists) return "";
+    if (!f.open("r")) return "";
+    var txt = f.read();
+    f.close();
+    return sttTrimText(txt);
+}
+
 function sttGetLatestXMLPath() {
     try {
-        var pointer = sttPointerFile();
-
-        if (!pointer.exists) {
-            return "";
-        }
-
-        if (!pointer.open("r")) {
-            return "";
-        }
-
-        var xmlPath = sttTrimText(pointer.read());
-        pointer.close();
-
-        return xmlPath;
+        return sttReadTextFile(sttPointerFile());
     } catch (e) {
-        return "ERROR: " + e;
+        return "";
+    }
+}
+
+function sttGetLatestXMLInfo() {
+    try {
+        var xmlPath = sttGetLatestXMLPath();
+        var xmlFile = xmlPath ? new File(xmlPath) : null;
+        var exists = xmlFile && xmlFile.exists;
+
+        var updated = "";
+        var jsonFile = sttPointerJsonFile();
+        if (jsonFile.exists && jsonFile.open("r")) {
+            var jsonText = jsonFile.read();
+            jsonFile.close();
+
+            var m = jsonText.match(/"updated_at"\s*:\s*"([^"]+)"/);
+            if (m && m[1]) updated = m[1];
+        }
+
+        var status = exists ? "XML ready." : "XML missing. Export XML again from STT AI Editor.";
+
+        return "{" +
+            "\"xml\":\"" + sttEscapeJSON(xmlPath) + "\"," +
+            "\"exists\":" + (exists ? "true" : "false") + "," +
+            "\"updated_at\":\"" + sttEscapeJSON(updated) + "\"," +
+            "\"status\":\"" + sttEscapeJSON(status) + "\"" +
+        "}";
+    } catch (e) {
+        return "{" +
+            "\"xml\":\"\"," +
+            "\"exists\":false," +
+            "\"updated_at\":\"\"," +
+            "\"status\":\"ERROR: " + sttEscapeJSON(e) + "\"" +
+        "}";
     }
 }
 
@@ -386,7 +477,7 @@ function sttImportLatestXML() {
     try {
         var xmlPath = sttGetLatestXMLPath();
 
-        if (!xmlPath || xmlPath.indexOf("ERROR:") === 0) {
+        if (!xmlPath) {
             return "Không thấy latest XML. Hãy export XML từ STT AI Editor trước.";
         }
 
@@ -407,7 +498,7 @@ function sttImportLatestXML() {
             false
         );
 
-        return "Đã gửi lệnh import XML: " + xmlFile.fsName;
+        return "Đã gửi lệnh import XML. Kiểm tra Project panel: " + xmlFile.fsName;
     } catch (e) {
         return "Import lỗi: " + e + ". Nếu cần, dùng File > Import thủ công.";
     }
@@ -417,7 +508,7 @@ function sttOpenLatestXMLFolder() {
     try {
         var xmlPath = sttGetLatestXMLPath();
 
-        if (!xmlPath || xmlPath.indexOf("ERROR:") === 0) {
+        if (!xmlPath) {
             return "Không thấy latest XML.";
         }
 
@@ -432,6 +523,10 @@ function sttOpenLatestXMLFolder() {
     } catch (e) {
         return "Open folder lỗi: " + e;
     }
+}
+
+function sttProjectPanelTip() {
+    return "Mở/kiểm tra Project panel. Sequence vừa import thường nằm trong Project panel.";
 }
 '''
 
@@ -449,6 +544,12 @@ function sttOpenLatestXMLFolder() {
   padding: 18px;
 }
 
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .badge {
   display: inline-block;
   padding: 5px 9px;
@@ -456,6 +557,25 @@ function sttOpenLatestXMLFolder() {
   border-radius: 999px;
   font-weight: bold;
   margin-bottom: 12px;
+}
+
+.dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 99px;
+  border: 1px solid #777;
+}
+
+.dot.ok {
+  background: #55d17a;
+}
+
+.dot.bad {
+  background: #e45f5f;
+}
+
+.dot.wait {
+  background: #e1c65d;
 }
 
 h1 {
@@ -470,7 +590,7 @@ h1 {
 
 button {
   width: 100%;
-  height: 38px;
+  min-height: 38px;
   margin: 7px 0;
   border-radius: 8px;
   border: 1px solid #555;
@@ -486,7 +606,7 @@ button:hover {
 button.primary {
   font-weight: bold;
   background: #2e2e2e;
-  border-color: #888;
+  border-color: #999;
 }
 
 .box {
@@ -495,6 +615,12 @@ button.primary {
   padding: 12px;
   margin-top: 12px;
   background: #1f1f1f;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
 }
 
 .label {
@@ -518,13 +644,7 @@ button.primary {
 
     @staticmethod
     def render_csinterface_stub() -> str:
-        # Minimal CSInterface for evalScript. Premiere CEP provides window.__adobe_cep__.
-        return r'''/*
-Minimal CSInterface stub for STT AI Editor panel.
-Enough for evalScript in CEP.
-*/
-
-function CSInterface() {}
+        return r'''function CSInterface() {}
 
 CSInterface.prototype.evalScript = function (script, callback) {
   if (window.__adobe_cep__) {
@@ -537,7 +657,6 @@ CSInterface.prototype.evalScript = function (script, callback) {
 
     @staticmethod
     def render_debug_bat() -> str:
-        # Add multiple CSXS versions to support many Premiere generations.
         return r'''@echo off
 echo ========================================
 echo Enable Adobe CEP Debug Mode
@@ -625,20 +744,16 @@ pause
     def render_readme(self, extension_dir: Path) -> str:
         return "\n".join(
             [
-                "STT AI Editor - Premiere Panel Starter",
+                "STT AI Editor - Premiere Panel Polish + Auto Pointer",
                 "=" * 72,
                 "",
-                "MỤC TIÊU:",
+                "Module 042 nâng cấp panel 041:",
                 "",
-                "Tạo panel STT AI Editor bên trong Premiere:",
-                "",
-                "Premiere Pro > Window > Extensions > STT AI Editor",
-                "",
-                "PANEL CÓ NÚT:",
-                "",
-                "- Refresh Latest XML",
-                "- Import Latest XML",
-                "- Open XML Folder",
+                "- Giao diện panel rõ hơn",
+                "- Có trạng thái XML tồn tại hay không",
+                "- Đọc thêm file JSON pointer",
+                "- STT app tự update pointer khi tạo panel",
+                "- Có nút Import / Open Folder rõ hơn",
                 "",
                 "CÀI PANEL:",
                 "",
@@ -653,24 +768,17 @@ pause
                 "4. Mở:",
                 "   Window > Extensions > STT AI Editor",
                 "",
-                "NẾU KHÔNG THẤY PANEL:",
-                "",
-                "- Chạy lại ENABLE_CEP_DEBUG_MODE.bat",
-                "- Restart Premiere",
-                "- Kiểm tra folder:",
-                f"  {self.get_user_cep_extensions_dir() / EXTENSION_ID}",
-                "",
                 "EXTENSION SOURCE:",
                 "",
                 str(extension_dir),
                 "",
-                "LƯU Ý:",
+                "POINTER:",
                 "",
-                "- Đây là panel starter đầu tiên, chưa phải bản plugin đóng gói chính thức.",
-                "- Panel đọc latest XML từ Module 040:",
-                f"  {self.latest_xml_pointer}",
-                "- Nếu Import trong panel không chạy, vẫn dùng cách chắc chắn:",
-                "  Premiere > File > Import > chọn XML",
+                str(self.latest_xml_pointer),
+                str(self.latest_xml_pointer_json),
+                "",
+                "Nếu Import trong panel không chạy, dùng:",
+                "Premiere > File > Import > chọn XML",
                 "",
             ]
         )
