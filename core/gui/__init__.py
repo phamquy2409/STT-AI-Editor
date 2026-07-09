@@ -73,4 +73,16 @@ try:
 except Exception as exc:
     print(f"STT GUI AI shot scorer patch skipped: {exc!r}")
 
+try:
+    from .prewedding_selector_patch import apply_prewedding_selector_patch
+    apply_prewedding_selector_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI prewedding selector patch skipped: {exc!r}")
+
+try:
+    from .compact_scroll_patch import apply_compact_scroll_patch
+    apply_compact_scroll_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI compact scroll patch skipped: {exc!r}")
+
 __all__ = ["STTAIEditorWindow", "run_gui"]

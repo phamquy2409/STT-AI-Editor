@@ -75,6 +75,8 @@ def build_exe(clean: bool = True) -> None:
         "core.gui.style_profile_patch",
         "core.gui.ai_style_memory_patch",
         "core.gui.ai_shot_scorer_patch",
+        "core.gui.prewedding_selector_patch",
+        "core.gui.compact_scroll_patch",
         "core.project",
         "core.pipeline",
         "core.pipeline_v2",
@@ -107,6 +109,8 @@ def build_exe(clean: bool = True) -> None:
         "core.ai_style_memory.memory",
         "core.ai_shot_scorer",
         "core.ai_shot_scorer.scorer",
+        "core.prewedding_selector",
+        "core.prewedding_selector.selector",
     ]
 
     cmd = [
