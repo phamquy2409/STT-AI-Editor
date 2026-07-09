@@ -133,6 +133,66 @@ except Exception as exc:
     print(f"STT GUI production_launcher_patch skipped: {exc!r}")
 
 try:
+    from .client_feedback_collector_patch import apply_client_feedback_collector_patch
+    apply_client_feedback_collector_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI client_feedback_collector_patch skipped: {exc!r}")
+
+try:
+    from .client_select_sync_patch import apply_client_select_sync_patch
+    apply_client_select_sync_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI client_select_sync_patch skipped: {exc!r}")
+
+try:
+    from .delivery_checklist_patch import apply_delivery_checklist_patch
+    apply_delivery_checklist_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI delivery_checklist_patch skipped: {exc!r}")
+
+try:
+    from .export_version_namer_patch import apply_export_version_namer_patch
+    apply_export_version_namer_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI export_version_namer_patch skipped: {exc!r}")
+
+try:
+    from .archive_cleaner_plan_patch import apply_archive_cleaner_plan_patch
+    apply_archive_cleaner_plan_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI archive_cleaner_plan_patch skipped: {exc!r}")
+
+try:
+    from .backup_verify_patch import apply_backup_verify_patch
+    apply_backup_verify_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI backup_verify_patch skipped: {exc!r}")
+
+try:
+    from .project_version_tracker_patch import apply_project_version_tracker_patch
+    apply_project_version_tracker_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI project_version_tracker_patch skipped: {exc!r}")
+
+try:
+    from .smart_folder_organizer_patch import apply_smart_folder_organizer_patch
+    apply_smart_folder_organizer_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI smart_folder_organizer_patch skipped: {exc!r}")
+
+try:
+    from .app_log_collector_patch import apply_app_log_collector_patch
+    apply_app_log_collector_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI app_log_collector_patch skipped: {exc!r}")
+
+try:
+    from .final_production_dashboard_patch import apply_final_production_dashboard_patch
+    apply_final_production_dashboard_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI final_production_dashboard_patch skipped: {exc!r}")
+
+try:
     from .compact_scroll_patch import apply_compact_scroll_patch
     apply_compact_scroll_patch(STTAIEditorWindow)
 except Exception as exc:
