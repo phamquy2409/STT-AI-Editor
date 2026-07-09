@@ -5,6 +5,7 @@ from pathlib import Path
 
 from core.exporter import export_premiere_xml_existing_project
 from core.media import scan_existing_project
+from core.moment import find_best_moments_existing_project
 from core.project import ProjectManager
 from core.reporting import generate_report_existing_project
 from core.review import generate_preview_review_existing_project
@@ -58,6 +59,12 @@ def main() -> None:
     review = sub.add_parser("review", help="Generate thumbnail HTML review page")
     review.add_argument("--project", required=True)
     review.add_argument("--roughcut-json", required=False)
+
+    moment = sub.add_parser("best-moments", help="Find best frame/second inside roughcut segments")
+    moment.add_argument("--project", required=True)
+    moment.add_argument("--roughcut-json", required=False)
+    moment.add_argument("--segment-seconds", type=float, default=2.2)
+    moment.add_argument("--sample-step", type=float, default=0.25)
 
     args = parser.parse_args()
 
@@ -127,6 +134,15 @@ def main() -> None:
         generate_preview_review_existing_project(
             project_root=Path(args.project),
             roughcut_json=Path(args.roughcut_json) if args.roughcut_json else None,
+        )
+        return
+
+    if args.command == "best-moments":
+        find_best_moments_existing_project(
+            project_root=Path(args.project),
+            roughcut_json=Path(args.roughcut_json) if args.roughcut_json else None,
+            refined_segment_seconds=args.segment_seconds,
+            sample_step_seconds=args.sample_step,
         )
         return
 
