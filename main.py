@@ -7,6 +7,7 @@ from core.exporter import export_premiere_xml_existing_project
 from core.media import scan_existing_project
 from core.project import ProjectManager
 from core.reporting import generate_report_existing_project
+from core.review import generate_preview_review_existing_project
 from core.roughcut import build_roughcut_existing_project
 from core.shot_detection import detect_shots_existing_project
 from core.vision import analyze_vision_existing_project
@@ -53,6 +54,10 @@ def main() -> None:
     premiere.add_argument("--fps", type=int, default=25)
     premiere.add_argument("--width", type=int, default=3840)
     premiere.add_argument("--height", type=int, default=2160)
+
+    review = sub.add_parser("review", help="Generate thumbnail HTML review page")
+    review.add_argument("--project", required=True)
+    review.add_argument("--roughcut-json", required=False)
 
     args = parser.parse_args()
 
@@ -115,6 +120,13 @@ def main() -> None:
             sequence_fps=args.fps,
             sequence_width=args.width,
             sequence_height=args.height,
+        )
+        return
+
+    if args.command == "review":
+        generate_preview_review_existing_project(
+            project_root=Path(args.project),
+            roughcut_json=Path(args.roughcut_json) if args.roughcut_json else None,
         )
         return
 
