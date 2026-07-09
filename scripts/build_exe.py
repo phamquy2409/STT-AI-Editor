@@ -72,6 +72,8 @@ def build_exe(clean: bool = True) -> None:
         "core.gui.premiere_panel_patch",
         "core.gui.premiere_pointer_patch",
         "core.gui.premiere_panel_sync_patch",
+        "core.gui.style_profile_patch",
+        "core.gui.ai_style_memory_patch",
         "core.project",
         "core.pipeline",
         "core.pipeline_v2",
@@ -98,6 +100,10 @@ def build_exe(clean: bool = True) -> None:
         "core.premiere_bridge.panel_installer",
         "core.premiere_bridge.pointer",
         "core.premiere_bridge.panel_sync",
+        "core.style_profile",
+        "core.style_profile.profile",
+        "core.ai_style_memory",
+        "core.ai_style_memory.memory",
     ]
 
     cmd = [

@@ -55,4 +55,16 @@ try:
 except Exception as exc:
     print(f"STT GUI premiere panel sync patch skipped: {exc!r}")
 
+try:
+    from .style_profile_patch import apply_style_profile_patch
+    apply_style_profile_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI style profile patch skipped: {exc!r}")
+
+try:
+    from .ai_style_memory_patch import apply_ai_style_memory_patch
+    apply_ai_style_memory_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI AI style memory patch skipped: {exc!r}")
+
 __all__ = ["STTAIEditorWindow", "run_gui"]
