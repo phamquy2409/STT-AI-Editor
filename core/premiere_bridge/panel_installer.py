@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from .bridge import PremiereBridgeExporter
+from .panel_sync import PremierePanelSync
 from .pointer import PremiereXMLPointer
 
 
@@ -27,12 +28,10 @@ class PremierePanelInstallerConfig:
 
 
 class PremierePanelInstaller:
-    # Module 042 upgrades Module 041 panel:
-    # - Better UI/status
-    # - Reads JSON pointer if available
-    # - More useful buttons
-    # - Clear warning when XML pointer is missing
-    # - Update pointer before creating/installing panel
+    # Module 043:
+    # - Builds status-aware Premiere CEP panel.
+    # - Installs to user CEP folder.
+    # - Runs panel sync before packaging.
 
     def __init__(self, project_root: str | Path = DEFAULT_PROJECT_ROOT) -> None:
         self.project_root = Path(project_root)
@@ -41,6 +40,7 @@ class PremierePanelInstaller:
         self.appdata_dir = self.pointer.appdata_dir
         self.latest_xml_pointer = self.pointer.pointer_txt
         self.latest_xml_pointer_json = self.pointer.pointer_json
+        self.status_json = self.appdata_dir / "premiere_panel_status.json"
 
     @staticmethod
     def get_user_cep_extensions_dir() -> Path:
@@ -63,7 +63,11 @@ class PremierePanelInstaller:
                 "Hãy bấm Export Latest Manual XML hoặc Premiere Bridge Package trước."
             )
 
-        pointer_data = self.pointer.update(xml_path=xml, source="module_042_panel_installer")
+        sync_result = PremierePanelSync(self.project_root).sync(
+            xml_path=xml,
+            validate_xml=True,
+            open_folder=False,
+        )
 
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         out_dir = self.exports_dir / f"premiere_panel_starter_{stamp}"
@@ -83,17 +87,6 @@ class PremierePanelInstaller:
         uninstall_bat = out_dir / "UNINSTALL_PANEL_FROM_USER_CEP.bat"
         uninstall_bat.write_text(self.render_uninstall_bat(), encoding="utf-8")
 
-        update_pointer_bat = out_dir / "Update_Latest_XML_Pointer.bat"
-        update_pointer_bat.write_text(
-            f'@echo off\n'
-            f'if not exist "%APPDATA%\\STT_AI_Editor" mkdir "%APPDATA%\\STT_AI_Editor"\n'
-            f'echo {xml.resolve()}> "%APPDATA%\\STT_AI_Editor\\premiere_latest_xml.txt"\n'
-            f'echo Latest XML pointer updated:\n'
-            f'type "%APPDATA%\\STT_AI_Editor\\premiere_latest_xml.txt"\n'
-            f'pause\n',
-            encoding="utf-8",
-        )
-
         installed_to = None
         install_error = None
 
@@ -105,20 +98,18 @@ class PremierePanelInstaller:
 
         manifest = {
             "created_at": datetime.now().isoformat(timespec="seconds"),
-            "module": "042_premiere_panel_polish_pointer",
+            "module": "043_premiere_panel_sync",
             "project_root": str(self.project_root),
             "xml": str(xml.resolve()),
+            "sync_result": sync_result,
             "latest_xml_pointer": str(self.latest_xml_pointer),
             "latest_xml_pointer_json": str(self.latest_xml_pointer_json),
-            "pointer_data": pointer_data,
+            "panel_status_json": str(self.status_json),
             "package_dir": str(out_dir),
             "extension_id": EXTENSION_ID,
             "extension_dir": str(extension_dir),
-            "user_cep_extensions_dir": str(self.get_user_cep_extensions_dir()),
             "installed_to_user_cep": str(installed_to) if installed_to else None,
             "install_error": install_error,
-            "premiere_menu_path": "Premiere Pro > Window > Extensions > STT AI Editor",
-            "note": "Nếu panel không hiện, chạy ENABLE_CEP_DEBUG_MODE.bat rồi restart Premiere.",
         }
 
         manifest_path = out_dir / "premiere_panel_manifest.json"
@@ -128,8 +119,9 @@ class PremierePanelInstaller:
             "ok": True,
             "project_root": str(self.project_root),
             "xml": str(xml.resolve()),
+            "sync_status": sync_result.get("status"),
             "latest_xml_pointer": str(self.latest_xml_pointer),
-            "latest_xml_pointer_json": str(self.latest_xml_pointer_json),
+            "panel_status_json": str(self.status_json),
             "package_dir": str(out_dir),
             "extension_dir": str(extension_dir),
             "installed_to_user_cep": str(installed_to) if installed_to else None,
@@ -215,14 +207,8 @@ class PremierePanelInstaller:
           <Type>Panel</Type>
           <Menu>{EXTENSION_NAME}</Menu>
           <Geometry>
-            <Size>
-              <Height>620</Height>
-              <Width>420</Width>
-            </Size>
-            <MinSize>
-              <Height>460</Height>
-              <Width>340</Width>
-            </MinSize>
+            <Size><Height>660</Height><Width>430</Width></Size>
+            <MinSize><Height>500</Height><Width>350</Width></MinSize>
           </Geometry>
         </UI>
       </DispatchInfo>
@@ -250,12 +236,12 @@ class PremierePanelInstaller:
     </div>
 
     <h1>Premiere Panel</h1>
-    <p class="muted">Module 042 - polished panel + auto XML pointer</p>
+    <p class="muted">Module 043 - panel sync</p>
 
     <button id="btnRefresh">Refresh Latest XML</button>
     <button id="btnImport" class="primary">Import Latest XML</button>
     <button id="btnOpenFolder">Open XML Folder</button>
-    <button id="btnRevealProject">Reveal in Project Panel</button>
+    <button id="btnOpenSyncReport">Open Sync Report</button>
 
     <div class="box">
       <div class="label">Latest XML</div>
@@ -268,8 +254,19 @@ class PremierePanelInstaller:
         <div id="xmlExists">-</div>
       </div>
       <div>
+        <div class="label">Sync</div>
+        <div id="syncStatus">-</div>
+      </div>
+    </div>
+
+    <div class="box grid">
+      <div>
         <div class="label">Updated</div>
         <div id="xmlUpdated">-</div>
+      </div>
+      <div>
+        <div class="label">Validation</div>
+        <div id="validationStatus">-</div>
       </div>
     </div>
 
@@ -288,14 +285,11 @@ class PremierePanelInstaller:
 
     @staticmethod
     def render_main_js() -> str:
-        return r'''/* STT AI Editor - CEP Panel main.js - Module 042 */
+        return r'''/* STT AI Editor - CEP Panel main.js - Module 043 */
 
 var csInterface = null;
-var lastXML = "";
 
-function el(id) {
-  return document.getElementById(id);
-}
+function el(id) { return document.getElementById(id); }
 
 function setText(id, text) {
   var node = el(id);
@@ -322,35 +316,36 @@ function evalHost(script, cb) {
 }
 
 function parseMaybeJSON(res) {
-  try {
-    return JSON.parse(res);
-  } catch (e) {
-    return null;
-  }
+  try { return JSON.parse(res); } catch (e) { return null; }
 }
 
 function refreshLatestXML() {
   setText("status", "Reading latest XML...");
   setDot("wait");
 
-  evalHost("sttGetLatestXMLInfo()", function (res) {
+  evalHost("sttGetLatestPanelInfo()", function (res) {
     var data = parseMaybeJSON(res);
 
     if (!data) {
-      setText("xmlPath", res || "Không thấy latest XML pointer.");
-      setText("xmlExists", "-");
-      setText("xmlUpdated", "-");
-      setText("status", res ? "Loaded text pointer." : "No XML found.");
-      setDot(res ? "ok" : "bad");
+      setText("status", res || "No panel info.");
+      setDot("bad");
       return;
     }
 
-    lastXML = data.xml || "";
-    setText("xmlPath", lastXML || "Không thấy XML.");
+    setText("xmlPath", data.xml || "Không thấy XML.");
     setText("xmlExists", data.exists ? "YES" : "NO");
+    setText("syncStatus", (data.sync_status || "-").toUpperCase());
     setText("xmlUpdated", data.updated_at || "-");
-    setText("status", data.status || "Ready");
-    setDot(data.exists ? "ok" : "bad");
+    setText("validationStatus", (data.validation_status || "-").toUpperCase());
+    setText("status", data.message || "Ready");
+
+    if (data.exists && data.sync_status !== "fail") {
+      setDot("ok");
+    } else if (data.sync_status === "warn") {
+      setDot("wait");
+    } else {
+      setDot("bad");
+    }
   });
 }
 
@@ -366,16 +361,16 @@ function importLatestXML() {
 }
 
 function openLatestXMLFolder() {
-  setText("status", "Opening folder...");
+  setText("status", "Opening XML folder...");
   evalHost("sttOpenLatestXMLFolder()", function (res) {
     setText("status", res || "Done.");
   });
 }
 
-function revealProjectPanel() {
-  setText("status", "Tip: Check Project panel for imported sequence.");
-  evalHost("sttProjectPanelTip()", function (res) {
-    setText("status", res || "Check Project panel.");
+function openSyncReport() {
+  setText("status", "Opening sync report...");
+  evalHost("sttOpenSyncReportFolder()", function (res) {
+    setText("status", res || "Done.");
   });
 }
 
@@ -390,7 +385,7 @@ window.onload = function () {
   el("btnRefresh").onclick = refreshLatestXML;
   el("btnImport").onclick = importLatestXML;
   el("btnOpenFolder").onclick = openLatestXMLFolder;
-  el("btnRevealProject").onclick = revealProjectPanel;
+  el("btnOpenSyncReport").onclick = openSyncReport;
 
   refreshLatestXML();
 };
@@ -400,19 +395,11 @@ window.onload = function () {
     def render_host_jsx() -> str:
         return r'''/*
 STT AI Editor - Premiere CEP Panel host.jsx
-Module 042
+Module 043
 */
 
 function sttTrimText(s) {
     return String(s).replace(/^\s+|\s+$/g, "");
-}
-
-function sttPointerFile() {
-    return new File(Folder.userData.fsName + "/STT_AI_Editor/premiere_latest_xml.txt");
-}
-
-function sttPointerJsonFile() {
-    return new File(Folder.userData.fsName + "/STT_AI_Editor/premiere_latest_xml.json");
 }
 
 function sttEscapeJSON(s) {
@@ -431,6 +418,14 @@ function sttReadTextFile(f) {
     return sttTrimText(txt);
 }
 
+function sttPointerFile() {
+    return new File(Folder.userData.fsName + "/STT_AI_Editor/premiere_latest_xml.txt");
+}
+
+function sttStatusFile() {
+    return new File(Folder.userData.fsName + "/STT_AI_Editor/premiere_panel_status.json");
+}
+
 function sttGetLatestXMLPath() {
     try {
         return sttReadTextFile(sttPointerFile());
@@ -439,36 +434,62 @@ function sttGetLatestXMLPath() {
     }
 }
 
-function sttGetLatestXMLInfo() {
+function sttExtractJSONField(jsonText, key) {
+    var re = new RegExp('"' + key + '"\\s*:\\s*"([^"]*)"', "m");
+    var m = jsonText.match(re);
+    if (m && m[1]) return m[1];
+    return "";
+}
+
+function sttGetLatestPanelInfo() {
     try {
         var xmlPath = sttGetLatestXMLPath();
         var xmlFile = xmlPath ? new File(xmlPath) : null;
         var exists = xmlFile && xmlFile.exists;
 
+        var statusFile = sttStatusFile();
+        var syncStatus = "";
         var updated = "";
-        var jsonFile = sttPointerJsonFile();
-        if (jsonFile.exists && jsonFile.open("r")) {
-            var jsonText = jsonFile.read();
-            jsonFile.close();
+        var validationStatus = "";
+        var reportDir = "";
 
-            var m = jsonText.match(/"updated_at"\s*:\s*"([^"]+)"/);
-            if (m && m[1]) updated = m[1];
+        if (statusFile.exists && statusFile.open("r")) {
+            var statusText = statusFile.read();
+            statusFile.close();
+
+            syncStatus = sttExtractJSONField(statusText, "status");
+            updated = sttExtractJSONField(statusText, "created_at");
+            reportDir = sttExtractJSONField(statusText, "report_dir");
+            validationStatus = sttExtractJSONField(statusText, "validation_status");
+
+            if (!validationStatus) {
+                var m = statusText.match(/"validation"\s*:\s*\{[\s\S]*?"status"\s*:\s*"([^"]+)"/m);
+                if (m && m[1]) validationStatus = m[1];
+            }
         }
 
-        var status = exists ? "XML ready." : "XML missing. Export XML again from STT AI Editor.";
+        if (!syncStatus) syncStatus = exists ? "ok" : "fail";
+
+        var message = exists ? "XML ready. Bấm Import Latest XML." : "XML missing. Export XML lại từ STT AI Editor.";
 
         return "{" +
             "\"xml\":\"" + sttEscapeJSON(xmlPath) + "\"," +
             "\"exists\":" + (exists ? "true" : "false") + "," +
+            "\"sync_status\":\"" + sttEscapeJSON(syncStatus) + "\"," +
             "\"updated_at\":\"" + sttEscapeJSON(updated) + "\"," +
-            "\"status\":\"" + sttEscapeJSON(status) + "\"" +
+            "\"validation_status\":\"" + sttEscapeJSON(validationStatus) + "\"," +
+            "\"report_dir\":\"" + sttEscapeJSON(reportDir) + "\"," +
+            "\"message\":\"" + sttEscapeJSON(message) + "\"" +
         "}";
     } catch (e) {
         return "{" +
             "\"xml\":\"\"," +
             "\"exists\":false," +
+            "\"sync_status\":\"fail\"," +
             "\"updated_at\":\"\"," +
-            "\"status\":\"ERROR: " + sttEscapeJSON(e) + "\"" +
+            "\"validation_status\":\"error\"," +
+            "\"report_dir\":\"\"," +
+            "\"message\":\"ERROR: " + sttEscapeJSON(e) + "\"" +
         "}";
     }
 }
@@ -491,12 +512,7 @@ function sttImportLatestXML() {
             app.newProject();
         }
 
-        app.project.importFiles(
-            [xmlFile.fsName],
-            false,
-            app.project.rootItem,
-            false
-        );
+        app.project.importFiles([xmlFile.fsName], false, app.project.rootItem, false);
 
         return "Đã gửi lệnh import XML. Kiểm tra Project panel: " + xmlFile.fsName;
     } catch (e) {
@@ -508,15 +524,10 @@ function sttOpenLatestXMLFolder() {
     try {
         var xmlPath = sttGetLatestXMLPath();
 
-        if (!xmlPath) {
-            return "Không thấy latest XML.";
-        }
+        if (!xmlPath) return "Không thấy latest XML.";
 
         var xmlFile = new File(xmlPath);
-
-        if (!xmlFile.exists) {
-            return "Không thấy XML: " + xmlPath;
-        }
+        if (!xmlFile.exists) return "Không thấy XML: " + xmlPath;
 
         xmlFile.parent.execute();
         return "Đã mở folder XML.";
@@ -525,8 +536,29 @@ function sttOpenLatestXMLFolder() {
     }
 }
 
-function sttProjectPanelTip() {
-    return "Mở/kiểm tra Project panel. Sequence vừa import thường nằm trong Project panel.";
+function sttOpenSyncReportFolder() {
+    try {
+        var statusFile = sttStatusFile();
+
+        if (!statusFile.exists) return "Không thấy sync status report.";
+
+        if (!statusFile.open("r")) return "Không đọc được sync status report.";
+
+        var statusText = statusFile.read();
+        statusFile.close();
+
+        var reportDir = sttExtractJSONField(statusText, "report_dir");
+
+        if (!reportDir) return "Không thấy report_dir trong status.";
+
+        var folder = new Folder(reportDir);
+        if (!folder.exists) return "Report folder không tồn tại: " + reportDir;
+
+        folder.execute();
+        return "Đã mở sync report folder.";
+    } catch (e) {
+        return "Open report lỗi: " + e;
+    }
 }
 '''
 
@@ -540,9 +572,7 @@ function sttProjectPanelTip() {
   font-size: 13px;
 }
 
-.wrap {
-  padding: 18px;
-}
+.wrap { padding: 18px; }
 
 .top {
   display: flex;
@@ -566,27 +596,13 @@ function sttProjectPanelTip() {
   border: 1px solid #777;
 }
 
-.dot.ok {
-  background: #55d17a;
-}
+.dot.ok { background: #55d17a; }
+.dot.bad { background: #e45f5f; }
+.dot.wait { background: #e1c65d; }
 
-.dot.bad {
-  background: #e45f5f;
-}
+h1 { margin: 0 0 6px; font-size: 22px; }
 
-.dot.wait {
-  background: #e1c65d;
-}
-
-h1 {
-  margin: 0 0 6px;
-  font-size: 22px;
-}
-
-.muted {
-  opacity: .65;
-  margin-top: 0;
-}
+.muted { opacity: .65; margin-top: 0; }
 
 button {
   width: 100%;
@@ -599,9 +615,7 @@ button {
   cursor: pointer;
 }
 
-button:hover {
-  background: #303030;
-}
+button:hover { background: #303030; }
 
 button.primary {
   font-weight: bold;
@@ -636,10 +650,7 @@ button.primary {
   font-size: 12px;
 }
 
-.hint {
-  opacity: .72;
-  line-height: 1.45;
-}
+.hint { opacity: .72; line-height: 1.45; }
 '''
 
     @staticmethod
@@ -744,41 +755,26 @@ pause
     def render_readme(self, extension_dir: Path) -> str:
         return "\n".join(
             [
-                "STT AI Editor - Premiere Panel Polish + Auto Pointer",
+                "STT AI Editor - Premiere Panel Sync",
                 "=" * 72,
                 "",
-                "Module 042 nâng cấp panel 041:",
+                "Module 043 nâng cấp panel:",
                 "",
-                "- Giao diện panel rõ hơn",
-                "- Có trạng thái XML tồn tại hay không",
-                "- Đọc thêm file JSON pointer",
-                "- STT app tự update pointer khi tạo panel",
-                "- Có nút Import / Open Folder rõ hơn",
+                "- Hiển thị Sync status",
+                "- Hiển thị Validation status",
+                "- Có nút Open Sync Report",
+                "- Có file premiere_panel_status.json",
+                "- Có lệnh sync riêng trong STT app",
                 "",
                 "CÀI PANEL:",
                 "",
-                "1. Chạy:",
-                "   ENABLE_CEP_DEBUG_MODE.bat",
-                "",
-                "2. Chạy:",
-                "   INSTALL_PANEL_TO_USER_CEP.bat",
-                "",
-                "3. Restart Premiere Pro.",
-                "",
-                "4. Mở:",
-                "   Window > Extensions > STT AI Editor",
+                "1. Chạy ENABLE_CEP_DEBUG_MODE.bat",
+                "2. Chạy INSTALL_PANEL_TO_USER_CEP.bat",
+                "3. Restart Premiere",
+                "4. Window > Extensions > STT AI Editor",
                 "",
                 "EXTENSION SOURCE:",
-                "",
                 str(extension_dir),
-                "",
-                "POINTER:",
-                "",
-                str(self.latest_xml_pointer),
-                str(self.latest_xml_pointer_json),
-                "",
-                "Nếu Import trong panel không chạy, dùng:",
-                "Premiere > File > Import > chọn XML",
                 "",
             ]
         )

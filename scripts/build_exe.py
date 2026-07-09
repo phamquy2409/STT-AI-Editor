@@ -61,10 +61,7 @@ def build_exe(clean: bool = True) -> None:
                 spec.unlink(missing_ok=True)
 
     hidden_imports = [
-        "cv2",
-        "numpy",
-        "sqlalchemy",
-        "ffmpeg",
+        "cv2", "numpy", "sqlalchemy", "ffmpeg",
         "core.gui",
         "core.gui.exe_live_patch",
         "core.gui.production_patch",
@@ -74,6 +71,7 @@ def build_exe(clean: bool = True) -> None:
         "core.gui.premiere_script_installer_patch",
         "core.gui.premiere_panel_patch",
         "core.gui.premiere_pointer_patch",
+        "core.gui.premiere_panel_sync_patch",
         "core.project",
         "core.pipeline",
         "core.pipeline_v2",
@@ -99,22 +97,15 @@ def build_exe(clean: bool = True) -> None:
         "core.premiere_bridge.script_installer",
         "core.premiere_bridge.panel_installer",
         "core.premiere_bridge.pointer",
+        "core.premiere_bridge.panel_sync",
     ]
 
     cmd = [
-        sys.executable,
-        "-m",
-        "PyInstaller",
-        "--noconfirm",
-        "--clean",
-        "--onedir",
-        "--windowed",
-        "--name",
-        APP_NAME,
-        "--add-data",
-        add_data_arg(live_script, "scripts"),
-        "--collect-all",
-        "PySide6",
+        sys.executable, "-m", "PyInstaller",
+        "--noconfirm", "--clean", "--onedir", "--windowed",
+        "--name", APP_NAME,
+        "--add-data", add_data_arg(live_script, "scripts"),
+        "--collect-all", "PySide6",
     ]
 
     for item in hidden_imports:
