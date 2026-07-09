@@ -104,6 +104,12 @@ except Exception as exc:
     print(f"STT GUI prewedding pipeline patch skipped: {exc!r}")
 
 try:
+    from .prewedding_doctor_patch import apply_prewedding_doctor_patch
+    apply_prewedding_doctor_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI prewedding doctor patch skipped: {exc!r}")
+
+try:
     from .compact_scroll_patch import apply_compact_scroll_patch
     apply_compact_scroll_patch(STTAIEditorWindow)
 except Exception as exc:

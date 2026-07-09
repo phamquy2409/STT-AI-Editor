@@ -70,7 +70,8 @@ def build_exe(clean: bool = True) -> None:
         "core.gui.ai_style_memory_patch", "core.gui.ai_shot_scorer_patch",
         "core.gui.prewedding_selector_patch", "core.gui.prewedding_roughcut_patch",
         "core.gui.prewedding_refiner_patch", "core.gui.prewedding_xml_patch",
-        "core.gui.prewedding_pipeline_patch", "core.gui.compact_scroll_patch",
+        "core.gui.prewedding_pipeline_patch", "core.gui.prewedding_doctor_patch",
+        "core.gui.compact_scroll_patch",
         "core.project", "core.pipeline", "core.pipeline_v2",
         "core.wedding_scene", "core.story_v2", "core.duplicate_remover",
         "core.feedback_learning", "core.xml_options", "core.manual_review",
@@ -89,6 +90,7 @@ def build_exe(clean: bool = True) -> None:
         "core.prewedding_refiner", "core.prewedding_refiner.refiner",
         "core.prewedding_xml", "core.prewedding_xml.exporter",
         "core.prewedding_pipeline", "core.prewedding_pipeline.runner",
+        "core.prewedding_doctor", "core.prewedding_doctor.doctor",
     ]
 
     cmd = [
