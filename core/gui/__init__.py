@@ -98,6 +98,12 @@ except Exception as exc:
     print(f"STT GUI prewedding XML patch skipped: {exc!r}")
 
 try:
+    from .prewedding_pipeline_patch import apply_prewedding_pipeline_patch
+    apply_prewedding_pipeline_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI prewedding pipeline patch skipped: {exc!r}")
+
+try:
     from .compact_scroll_patch import apply_compact_scroll_patch
     apply_compact_scroll_patch(STTAIEditorWindow)
 except Exception as exc:

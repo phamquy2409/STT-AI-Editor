@@ -62,64 +62,33 @@ def build_exe(clean: bool = True) -> None:
 
     hidden_imports = [
         "cv2", "numpy", "sqlalchemy", "ffmpeg",
-        "core.gui",
-        "core.gui.exe_live_patch",
-        "core.gui.production_patch",
-        "core.gui.premiere_bridge_patch",
-        "core.gui.premiere_xml_validator_patch",
-        "core.gui.premiere_jsx_helper_patch",
-        "core.gui.premiere_script_installer_patch",
-        "core.gui.premiere_panel_patch",
-        "core.gui.premiere_pointer_patch",
-        "core.gui.premiere_panel_sync_patch",
-        "core.gui.style_profile_patch",
-        "core.gui.ai_style_memory_patch",
-        "core.gui.ai_shot_scorer_patch",
-        "core.gui.prewedding_selector_patch",
-        "core.gui.prewedding_roughcut_patch",
-        "core.gui.prewedding_refiner_patch",
-        "core.gui.prewedding_xml_patch",
-        "core.gui.compact_scroll_patch",
-        "core.project",
-        "core.pipeline",
-        "core.pipeline_v2",
-        "core.wedding_scene",
-        "core.story_v2",
-        "core.duplicate_remover",
-        "core.feedback_learning",
-        "core.xml_options",
-        "core.manual_review",
-        "core.manual_live",
-        "core.manual_live.live_review_server",
-        "core.manual_export",
-        "core.exporter",
-        "core.review",
-        "core.project_presets",
-        "core.export_cleaner",
-        "core.app_health",
-        "core.app_health.health",
-        "core.premiere_bridge",
-        "core.premiere_bridge.bridge",
-        "core.premiere_bridge.validator",
-        "core.premiere_bridge.jsx_helper",
-        "core.premiere_bridge.script_installer",
-        "core.premiere_bridge.panel_installer",
-        "core.premiere_bridge.pointer",
-        "core.premiere_bridge.panel_sync",
-        "core.style_profile",
-        "core.style_profile.profile",
-        "core.ai_style_memory",
-        "core.ai_style_memory.memory",
-        "core.ai_shot_scorer",
-        "core.ai_shot_scorer.scorer",
-        "core.prewedding_selector",
-        "core.prewedding_selector.selector",
-        "core.prewedding_roughcut",
-        "core.prewedding_roughcut.builder",
-        "core.prewedding_refiner",
-        "core.prewedding_refiner.refiner",
-        "core.prewedding_xml",
-        "core.prewedding_xml.exporter",
+        "core.gui", "core.gui.exe_live_patch", "core.gui.production_patch",
+        "core.gui.premiere_bridge_patch", "core.gui.premiere_xml_validator_patch",
+        "core.gui.premiere_jsx_helper_patch", "core.gui.premiere_script_installer_patch",
+        "core.gui.premiere_panel_patch", "core.gui.premiere_pointer_patch",
+        "core.gui.premiere_panel_sync_patch", "core.gui.style_profile_patch",
+        "core.gui.ai_style_memory_patch", "core.gui.ai_shot_scorer_patch",
+        "core.gui.prewedding_selector_patch", "core.gui.prewedding_roughcut_patch",
+        "core.gui.prewedding_refiner_patch", "core.gui.prewedding_xml_patch",
+        "core.gui.prewedding_pipeline_patch", "core.gui.compact_scroll_patch",
+        "core.project", "core.pipeline", "core.pipeline_v2",
+        "core.wedding_scene", "core.story_v2", "core.duplicate_remover",
+        "core.feedback_learning", "core.xml_options", "core.manual_review",
+        "core.manual_live", "core.manual_live.live_review_server",
+        "core.manual_export", "core.exporter", "core.review",
+        "core.project_presets", "core.export_cleaner", "core.app_health",
+        "core.app_health.health", "core.premiere_bridge", "core.premiere_bridge.bridge",
+        "core.premiere_bridge.validator", "core.premiere_bridge.jsx_helper",
+        "core.premiere_bridge.script_installer", "core.premiere_bridge.panel_installer",
+        "core.premiere_bridge.pointer", "core.premiere_bridge.panel_sync",
+        "core.style_profile", "core.style_profile.profile",
+        "core.ai_style_memory", "core.ai_style_memory.memory",
+        "core.ai_shot_scorer", "core.ai_shot_scorer.scorer",
+        "core.prewedding_selector", "core.prewedding_selector.selector",
+        "core.prewedding_roughcut", "core.prewedding_roughcut.builder",
+        "core.prewedding_refiner", "core.prewedding_refiner.refiner",
+        "core.prewedding_xml", "core.prewedding_xml.exporter",
+        "core.prewedding_pipeline", "core.prewedding_pipeline.runner",
     ]
 
     cmd = [
@@ -134,7 +103,6 @@ def build_exe(clean: bool = True) -> None:
         cmd += ["--hidden-import", item]
 
     cmd.append(str(entry))
-
     run(cmd, cwd=repo_root)
 
     exe_path = repo_root / "dist" / APP_NAME / f"{APP_NAME}.exe"
@@ -149,14 +117,12 @@ def build_exe(clean: bool = True) -> None:
         print("EXE:")
         print(exe_path)
         print()
-
         if bundled_live_script.exists():
             print("Live Review script bundled OK:")
             print(bundled_live_script)
         else:
             print("WARNING: Live Review script missing, but Module 034C can run live server in-process:")
             print(bundled_live_script)
-
         print()
         print("Run test:")
         print(f'& "{exe_path}"')
