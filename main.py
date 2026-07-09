@@ -11,6 +11,7 @@ from core.manual_review import generate_manual_review_existing_project
 from core.media import scan_existing_project
 from core.moment import find_best_moments_existing_project
 from core.people_composition import analyze_people_composition_existing_project
+from core.pipeline import run_one_click_pipeline_existing_project
 from core.project import ProjectManager
 from core.reporting import generate_report_existing_project
 from core.review import generate_preview_review_existing_project
@@ -42,7 +43,7 @@ def main() -> None:
     vision = sub.add_parser("analyze-vision", help="Analyze segment sharpness/exposure/motion/stability")
     vision.add_argument("--project", required=True)
     vision.add_argument("--limit", type=int, default=None)
-    vision.add_argument("--all", action="store_true", help="Analyze all segments, including already analyzed ones")
+    vision.add_argument("--all", action="store_true")
 
     report = sub.add_parser("report", help="Export ranked CSV reports")
     report.add_argument("--project", required=True)
@@ -103,6 +104,13 @@ def main() -> None:
     manual_export.add_argument("--project", required=True)
     manual_export.add_argument("--selection-json", required=False)
 
+    pipeline = sub.add_parser("pipeline", help="Run one-click STT AI Editor pipeline")
+    pipeline.add_argument("--project", required=True)
+    pipeline.add_argument("--source-folder", required=False)
+    pipeline.add_argument("--from-scratch", action="store_true")
+    pipeline.add_argument("--target-duration", type=float, default=60.0)
+    pipeline.add_argument("--top-candidates", type=int, default=120)
+
     args = parser.parse_args()
 
     if args.command == "new-project":
@@ -118,102 +126,127 @@ def main() -> None:
         return
 
     if args.command == "scan":
-        scan_existing_project(Path(args.project), Path(args.source_folder) if args.source_folder else None)
+        scan_existing_project(
+            project_root=Path(args.project),
+            source_folder=Path(args.source_folder) if args.source_folder else None,
+        )
         return
 
     if args.command == "detect-shots":
-        detect_shots_existing_project(Path(args.project), args.segment_seconds, not args.keep_existing)
+        detect_shots_existing_project(
+            project_root=Path(args.project),
+            segment_seconds=args.segment_seconds,
+            reset_existing=not args.keep_existing,
+        )
         return
 
     if args.command == "analyze-vision":
-        analyze_vision_existing_project(Path(args.project), args.limit, not args.all)
+        analyze_vision_existing_project(
+            project_root=Path(args.project),
+            limit=args.limit,
+            only_pending=not args.all,
+        )
         return
 
     if args.command == "report":
-        generate_report_existing_project(Path(args.project), args.limit, args.min_keep_score)
+        generate_report_existing_project(
+            project_root=Path(args.project),
+            limit=args.limit,
+            min_keep_score=args.min_keep_score,
+        )
         return
 
     if args.command == "roughcut":
         build_roughcut_existing_project(
-            Path(args.project),
-            args.target_duration,
-            args.min_keep_score,
-            args.max_segments_per_video,
+            project_root=Path(args.project),
+            target_duration_seconds=args.target_duration,
+            min_keep_score=args.min_keep_score,
+            max_segments_per_video=args.max_segments_per_video,
         )
         return
 
     if args.command == "premiere-xml":
         export_premiere_xml_existing_project(
-            Path(args.project),
-            Path(args.roughcut_json) if args.roughcut_json else None,
-            args.fps,
-            args.width,
-            args.height,
+            project_root=Path(args.project),
+            roughcut_json=Path(args.roughcut_json) if args.roughcut_json else None,
+            sequence_fps=args.fps,
+            sequence_width=args.width,
+            sequence_height=args.height,
         )
         return
 
     if args.command == "review":
         generate_preview_review_existing_project(
-            Path(args.project),
-            Path(args.roughcut_json) if args.roughcut_json else None,
+            project_root=Path(args.project),
+            roughcut_json=Path(args.roughcut_json) if args.roughcut_json else None,
         )
         return
 
     if args.command == "best-moments":
         find_best_moments_existing_project(
-            Path(args.project),
-            Path(args.roughcut_json) if args.roughcut_json else None,
-            args.segment_seconds,
-            args.sample_step,
+            project_root=Path(args.project),
+            roughcut_json=Path(args.roughcut_json) if args.roughcut_json else None,
+            refined_segment_seconds=args.segment_seconds,
+            sample_step_seconds=args.sample_step,
         )
         return
 
     if args.command == "people-composition":
         analyze_people_composition_existing_project(
-            Path(args.project),
-            Path(args.input_json) if args.input_json else None,
+            project_root=Path(args.project),
+            input_json=Path(args.input_json) if args.input_json else None,
         )
         return
 
     if args.command == "final-roughcut":
         build_final_roughcut_existing_project(
-            Path(args.project),
-            Path(args.input_json) if args.input_json else None,
-            args.target_duration,
-            args.min_final_score,
-            args.max_segments_per_video,
+            project_root=Path(args.project),
+            input_json=Path(args.input_json) if args.input_json else None,
+            target_duration_seconds=args.target_duration,
+            min_final_score=args.min_final_score,
+            max_segments_per_video=args.max_segments_per_video,
         )
         return
 
     if args.command == "expand-candidates":
         expand_candidates_existing_project(
-            Path(args.project),
-            args.top_candidates,
-            args.min_ai_score,
-            args.max_segments_per_video,
+            project_root=Path(args.project),
+            top_candidates=args.top_candidates,
+            min_ai_score=args.min_ai_score,
+            max_segments_per_video=args.max_segments_per_video,
         )
         return
 
     if args.command == "story-timeline":
         build_story_timeline_existing_project(
-            Path(args.project),
-            Path(args.input_json) if args.input_json else None,
-            args.target_duration,
-            args.max_segments_per_video,
+            project_root=Path(args.project),
+            input_json=Path(args.input_json) if args.input_json else None,
+            target_duration_seconds=args.target_duration,
+            max_segments_per_video=args.max_segments_per_video,
         )
         return
 
     if args.command == "manual-review":
         generate_manual_review_existing_project(
-            Path(args.project),
-            Path(args.input_json) if args.input_json else None,
+            project_root=Path(args.project),
+            input_json=Path(args.input_json) if args.input_json else None,
         )
         return
 
     if args.command == "manual-export":
         build_manual_selection_existing_project(
-            Path(args.project),
-            Path(args.selection_json) if args.selection_json else None,
+            project_root=Path(args.project),
+            selection_json=Path(args.selection_json) if args.selection_json else None,
+        )
+        return
+
+    if args.command == "pipeline":
+        run_one_click_pipeline_existing_project(
+            project_root=Path(args.project),
+            source_folder=Path(args.source_folder) if args.source_folder else None,
+            run_from_scratch=args.from_scratch,
+            target_duration_seconds=args.target_duration,
+            top_candidates=args.top_candidates,
         )
         return
 
