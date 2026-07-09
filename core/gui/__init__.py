@@ -122,6 +122,12 @@ except Exception as exc:
     print(f"STT GUI project command center patch skipped: {exc!r}")
 
 try:
+    from .music_placeholder_patch import apply_music_placeholder_patch
+    apply_music_placeholder_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI music placeholder patch skipped: {exc!r}")
+
+try:
     from .pipeline_snapshot_patch import apply_pipeline_snapshot_patch
     apply_pipeline_snapshot_patch(STTAIEditorWindow)
 except Exception as exc:
