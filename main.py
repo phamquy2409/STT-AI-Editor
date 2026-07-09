@@ -6,6 +6,7 @@ from pathlib import Path
 from core.media import scan_existing_project
 from core.project import ProjectManager
 from core.shot_detection import detect_shots_existing_project
+from core.vision import analyze_vision_existing_project
 
 
 def main() -> None:
@@ -26,6 +27,11 @@ def main() -> None:
     shots.add_argument("--project", required=True)
     shots.add_argument("--segment-seconds", type=float, default=3.0)
     shots.add_argument("--keep-existing", action="store_true")
+
+    vision = sub.add_parser("analyze-vision", help="Analyze segment sharpness/exposure/motion/stability")
+    vision.add_argument("--project", required=True)
+    vision.add_argument("--limit", type=int, default=None)
+    vision.add_argument("--all", action="store_true", help="Analyze all segments, including already analyzed ones")
 
     args = parser.parse_args()
 
@@ -53,6 +59,14 @@ def main() -> None:
             project_root=Path(args.project),
             segment_seconds=args.segment_seconds,
             reset_existing=not args.keep_existing,
+        )
+        return
+
+    if args.command == "analyze-vision":
+        analyze_vision_existing_project(
+            project_root=Path(args.project),
+            limit=args.limit,
+            only_pending=not args.all,
         )
         return
 
