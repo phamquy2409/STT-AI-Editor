@@ -1,0 +1,17 @@
+# STT AI Editor recommended gitignore
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+build/
+dist/
+releases/
+*.spec
+
+*.log
+*.tmp
+
+# Local project data should stay outside git
+Wedding_Test_001/
