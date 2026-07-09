@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import mimetypes
+import threading
 import urllib.parse
 import webbrowser
 from datetime import datetime
@@ -21,20 +22,24 @@ from core.project import ProjectManager
 
 
 class LiveManualReviewServer:
-    # Module 031C.
-    # Fix live review thumbnails when old thumbnail files are missing.
+    # Module 034C.
+    # Adds background/in-process server support for PyInstaller EXE.
     #
-    # Fixes:
-    # 1. Serve thumbnails/videos through /media/<id>
-    # 2. If thumbnail file is missing, generate thumbnail directly from source video
-    # 3. Save generated thumbnails into:
-    #    <input json folder>/_live_thumbnails/
+    # Why:
+    # In EXE mode, sys.executable is STT AI Editor.exe, not python.exe.
+    # Starting run_live_manual_review.py through sys.executable can fail.
+    #
+    # Fix:
+    # GUI can now create LiveManualReviewServer(...) and run it in a background thread.
 
     def __init__(self, project_root: str | Path, port: int = 8787, input_json: str | Path | None = None) -> None:
         self.project_root = Path(project_root)
         self.port = int(port)
         self.input_json = Path(input_json) if input_json else None
         self.media_map: dict[str, Path] = {}
+        self.httpd: ThreadingHTTPServer | None = None
+        self.thread: threading.Thread | None = None
+        self.is_running = False
 
         self.project = ProjectManager().open_project(self.project_root)
 
@@ -48,6 +53,36 @@ class LiveManualReviewServer:
         self.generated_thumb_dir.mkdir(parents=True, exist_ok=True)
 
         self._prepare_media_urls()
+
+    @property
+    def url(self) -> str:
+        return f"http://127.0.0.1:{self.port}"
+
+    def start_background(self, open_browser: bool = False) -> None:
+        if self.thread and self.thread.is_alive():
+            if open_browser:
+                webbrowser.open(self.url)
+            return
+
+        self.thread = threading.Thread(
+            target=lambda: self.serve(open_browser=open_browser),
+            name=f"STTLiveManualReview-{self.port}",
+            daemon=True,
+        )
+        self.thread.start()
+
+    def stop(self) -> None:
+        self.is_running = False
+        if self.httpd is not None:
+            try:
+                self.httpd.shutdown()
+            except Exception:
+                pass
+            try:
+                self.httpd.server_close()
+            except Exception:
+                pass
+        self.httpd = None
 
     def _prepare_media_urls(self) -> None:
         for index, item in enumerate(self.items, start=1):
@@ -84,14 +119,12 @@ class LiveManualReviewServer:
 
         order = int(float(item.get("order", index) or index))
 
-        # Common folders from previous modules.
         possible_parents = [
             self.input_json.parent,
             self.save_dir,
             self.project_root / "exports",
         ]
 
-        # Also check sibling/latest review folders.
         exports_dir = self.project_root / "exports"
         if exports_dir.exists():
             possible_parents.extend([p for p in exports_dir.iterdir() if p.is_dir() and p.name != "_archive"])
@@ -109,7 +142,6 @@ class LiveManualReviewServer:
             if key in seen:
                 continue
             seen.add(key)
-
             if p.exists() and p.is_file() and p.stat().st_size > 0:
                 return p
 
@@ -137,7 +169,6 @@ class LiveManualReviewServer:
             return out_path
 
         start_seconds = self._num(item, "source_start_seconds", 0.0)
-        # Go slightly after start to avoid black transition frame.
         grab_seconds = max(0.0, start_seconds + 0.35)
 
         cap = None
@@ -189,7 +220,7 @@ class LiveManualReviewServer:
             if cap is not None:
                 cap.release()
 
-    def run(self) -> None:
+    def serve(self, open_browser: bool = True) -> None:
         outer = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -260,8 +291,8 @@ class LiveManualReviewServer:
             def log_message(self, format: str, *args: Any) -> None:
                 print(f"[LiveManual] {format % args}")
 
-        httpd = ThreadingHTTPServer(("127.0.0.1", self.port), Handler)
-        url = f"http://127.0.0.1:{self.port}"
+        self.httpd = ThreadingHTTPServer(("127.0.0.1", self.port), Handler)
+        self.is_running = True
 
         thumb_count = sum(1 for item in self.items if item.get("thumbnail_url"))
         print("STT AI Live Manual Review")
@@ -270,24 +301,35 @@ class LiveManualReviewServer:
         print(f"Items: {len(self.items)}")
         print(f"Thumbnails available: {thumb_count}/{len(self.items)}")
         print(f"Media files: {len(self.media_map)}")
-        print(f"URL: {url}")
-        print("Press Ctrl+C to stop server.")
-        webbrowser.open(url)
+        print(f"URL: {self.url}")
+        print("Press Ctrl+C or Stop Live Server to stop.")
+
+        if open_browser:
+            webbrowser.open(self.url)
 
         try:
-            httpd.serve_forever()
+            self.httpd.serve_forever()
         except KeyboardInterrupt:
             pass
         finally:
-            httpd.server_close()
+            self.is_running = False
+            try:
+                if self.httpd is not None:
+                    self.httpd.server_close()
+            except Exception:
+                pass
+            self.httpd = None
             print("Live Manual Review stopped.")
+
+    def run(self) -> None:
+        self.serve(open_browser=True)
 
     def save_selection(self, payload: dict[str, Any], autosave: bool = False) -> dict[str, Any]:
         payload = dict(payload)
         payload["project_root"] = str(self.project_root)
         payload["source"] = str(self.input_json)
         payload["saved_at"] = datetime.now().isoformat(timespec="seconds")
-        payload["ui"] = "module_031c_live_manual_review"
+        payload["ui"] = "module_034c_live_manual_review_inprocess"
 
         name = "manual_selection_autosave.json" if autosave else "manual_selection.json"
         path = self.save_dir / name
