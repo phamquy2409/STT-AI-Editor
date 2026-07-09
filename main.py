@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 
 from core.exporter import export_premiere_xml_existing_project
+from core.final_cut import build_final_roughcut_existing_project
 from core.media import scan_existing_project
 from core.moment import find_best_moments_existing_project
 from core.people_composition import analyze_people_composition_existing_project
@@ -70,6 +71,13 @@ def main() -> None:
     people = sub.add_parser("people-composition", help="Analyze faces/people/composition on selected moments")
     people.add_argument("--project", required=True)
     people.add_argument("--input-json", required=False)
+
+    final = sub.add_parser("final-roughcut", help="Build final rough cut from people/composition scores")
+    final.add_argument("--project", required=True)
+    final.add_argument("--input-json", required=False)
+    final.add_argument("--target-duration", type=float, default=60.0)
+    final.add_argument("--min-final-score", type=float, default=20.0)
+    final.add_argument("--max-segments-per-video", type=int, default=2)
 
     args = parser.parse_args()
 
@@ -155,6 +163,16 @@ def main() -> None:
         analyze_people_composition_existing_project(
             project_root=Path(args.project),
             input_json=Path(args.input_json) if args.input_json else None,
+        )
+        return
+
+    if args.command == "final-roughcut":
+        build_final_roughcut_existing_project(
+            project_root=Path(args.project),
+            input_json=Path(args.input_json) if args.input_json else None,
+            target_duration_seconds=args.target_duration,
+            min_final_score=args.min_final_score,
+            max_segments_per_video=args.max_segments_per_video,
         )
         return
 
