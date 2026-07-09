@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from core.exporter import export_premiere_xml_existing_project
 from core.media import scan_existing_project
 from core.project import ProjectManager
 from core.reporting import generate_report_existing_project
@@ -45,6 +46,13 @@ def main() -> None:
     roughcut.add_argument("--target-duration", type=float, default=60.0)
     roughcut.add_argument("--min-keep-score", type=float, default=45.0)
     roughcut.add_argument("--max-segments-per-video", type=int, default=2)
+
+    premiere = sub.add_parser("premiere-xml", help="Export Premiere/FCP7 XML from rough cut")
+    premiere.add_argument("--project", required=True)
+    premiere.add_argument("--roughcut-json", required=False)
+    premiere.add_argument("--fps", type=int, default=25)
+    premiere.add_argument("--width", type=int, default=3840)
+    premiere.add_argument("--height", type=int, default=2160)
 
     args = parser.parse_args()
 
@@ -97,6 +105,16 @@ def main() -> None:
             target_duration_seconds=args.target_duration,
             min_keep_score=args.min_keep_score,
             max_segments_per_video=args.max_segments_per_video,
+        )
+        return
+
+    if args.command == "premiere-xml":
+        export_premiere_xml_existing_project(
+            project_root=Path(args.project),
+            roughcut_json=Path(args.roughcut_json) if args.roughcut_json else None,
+            sequence_fps=args.fps,
+            sequence_width=args.width,
+            sequence_height=args.height,
         )
         return
 
