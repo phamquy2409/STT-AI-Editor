@@ -29,4 +29,11 @@ try:
 except Exception as exc:
     print(f"STT GUI premiere XML validator patch skipped: {exc!r}")
 
+try:
+    from .premiere_jsx_helper_patch import apply_premiere_jsx_helper_patch
+
+    apply_premiere_jsx_helper_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI premiere JSX helper patch skipped: {exc!r}")
+
 __all__ = ["STTAIEditorWindow", "run_gui"]
