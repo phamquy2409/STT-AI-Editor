@@ -13,6 +13,90 @@ except Exception as exc:
     print(f"STT GUI production_patch skipped: {exc!r}")
 
 try:
+    from .premiere_bridge_patch import apply_premiere_bridge_patch
+    apply_premiere_bridge_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI premiere_bridge_patch skipped: {exc!r}")
+
+try:
+    from .premiere_xml_validator_patch import apply_premiere_xml_validator_patch
+    apply_premiere_xml_validator_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI premiere_xml_validator_patch skipped: {exc!r}")
+
+try:
+    from .premiere_jsx_helper_patch import apply_premiere_jsx_helper_patch
+    apply_premiere_jsx_helper_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI premiere_jsx_helper_patch skipped: {exc!r}")
+
+try:
+    from .premiere_script_installer_patch import apply_premiere_script_installer_patch
+    apply_premiere_script_installer_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI premiere_script_installer_patch skipped: {exc!r}")
+
+try:
+    from .premiere_panel_patch import apply_premiere_panel_patch
+    apply_premiere_panel_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI premiere_panel_patch skipped: {exc!r}")
+
+try:
+    from .premiere_pointer_patch import apply_premiere_pointer_patch
+    apply_premiere_pointer_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI premiere_pointer_patch skipped: {exc!r}")
+
+try:
+    from .premiere_panel_sync_patch import apply_premiere_panel_sync_patch
+    apply_premiere_panel_sync_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI premiere_panel_sync_patch skipped: {exc!r}")
+
+try:
+    from .style_profile_patch import apply_style_profile_patch
+    apply_style_profile_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI style_profile_patch skipped: {exc!r}")
+
+try:
+    from .ai_style_memory_patch import apply_ai_style_memory_patch
+    apply_ai_style_memory_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI ai_style_memory_patch skipped: {exc!r}")
+
+try:
+    from .ai_shot_scorer_patch import apply_ai_shot_scorer_patch
+    apply_ai_shot_scorer_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI ai_shot_scorer_patch skipped: {exc!r}")
+
+try:
+    from .prewedding_selector_patch import apply_prewedding_selector_patch
+    apply_prewedding_selector_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI prewedding_selector_patch skipped: {exc!r}")
+
+try:
+    from .prewedding_roughcut_patch import apply_prewedding_roughcut_patch
+    apply_prewedding_roughcut_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI prewedding_roughcut_patch skipped: {exc!r}")
+
+try:
+    from .prewedding_refiner_patch import apply_prewedding_refiner_patch
+    apply_prewedding_refiner_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI prewedding_refiner_patch skipped: {exc!r}")
+
+try:
+    from .prewedding_xml_patch import apply_prewedding_xml_patch
+    apply_prewedding_xml_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI prewedding_xml_patch skipped: {exc!r}")
+
+try:
     from .prewedding_pipeline_patch import apply_prewedding_pipeline_patch
     apply_prewedding_pipeline_patch(STTAIEditorWindow)
 except Exception as exc:
@@ -191,6 +275,66 @@ try:
     apply_final_production_dashboard_patch(STTAIEditorWindow)
 except Exception as exc:
     print(f"STT GUI final_production_dashboard_patch skipped: {exc!r}")
+
+try:
+    from .local_command_server_patch import apply_local_command_server_patch
+    apply_local_command_server_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI local_command_server_patch skipped: {exc!r}")
+
+try:
+    from .premiere_panel_run_buttons_patch import apply_premiere_panel_run_buttons_patch
+    apply_premiere_panel_run_buttons_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI premiere_panel_run_buttons_patch skipped: {exc!r}")
+
+try:
+    from .panel_command_bridge_patch import apply_panel_command_bridge_patch
+    apply_panel_command_bridge_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI panel_command_bridge_patch skipped: {exc!r}")
+
+try:
+    from .auto_xml_refresh_patch import apply_auto_xml_refresh_patch
+    apply_auto_xml_refresh_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI auto_xml_refresh_patch skipped: {exc!r}")
+
+try:
+    from .auto_import_helper_patch import apply_auto_import_helper_patch
+    apply_auto_import_helper_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI auto_import_helper_patch skipped: {exc!r}")
+
+try:
+    from .panel_progress_status_patch import apply_panel_progress_status_patch
+    apply_panel_progress_status_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI panel_progress_status_patch skipped: {exc!r}")
+
+try:
+    from .panel_source_folder_patch import apply_panel_source_folder_patch
+    apply_panel_source_folder_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI panel_source_folder_patch skipped: {exc!r}")
+
+try:
+    from .panel_pipeline_presets_patch import apply_panel_pipeline_presets_patch
+    apply_panel_pipeline_presets_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI panel_pipeline_presets_patch skipped: {exc!r}")
+
+try:
+    from .panel_error_reporter_patch import apply_panel_error_reporter_patch
+    apply_panel_error_reporter_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI panel_error_reporter_patch skipped: {exc!r}")
+
+try:
+    from .background_app_start_helper_patch import apply_background_app_start_helper_patch
+    apply_background_app_start_helper_patch(STTAIEditorWindow)
+except Exception as exc:
+    print(f"STT GUI background_app_start_helper_patch skipped: {exc!r}")
 
 try:
     from .compact_scroll_patch import apply_compact_scroll_patch
