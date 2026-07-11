@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>STT Audio Bridge</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 16px;
+      background: #202020;
+      color: #f2f2f2;
+      font-family: Arial, sans-serif;
+      font-size: 13px;
+    }
+    h2 {
+      margin: 0 0 10px 0;
+      font-size: 16px;
+    }
+    p {
+      line-height: 1.45;
+      color: #cccccc;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      border: 0;
+      border-radius: 5px;
+      background: #7b61ff;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #8c74ff;
+    }
+    #status {
+      margin-top: 12px;
+      padding: 10px;
+      border-radius: 4px;
+      background: #151515;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <h2>STT Audio Bridge 128H</h2>
+  <p>
+    Mở sequence <b>STT 128H VIDEO ONLY</b>, sau đó bấm nút và chọn
+    <b>stt_128h_music_STEREO_48K.wav</b>.
+  </p>
+  <button id="insert">Import + đặt nhạc Stereo</button>
+  <div id="status">Sẵn sàng.</div>
+
+  <script>
+    function evalHost(script, callback) {
+      if (!window.__adobe_cep__) {
+        callback("ERROR|CEP bridge không hoạt động.");
+        return;
+      }
+      window.__adobe_cep__.evalScript(script, callback);
+    }
+
+    document.getElementById("insert").addEventListener("click", function () {
+      var status = document.getElementById("status");
+      status.textContent = "Đang import và đặt nhạc...";
+      evalHost("STT128H.chooseAndInsertStereoMusic()", function (result) {
+        status.textContent = result || "Không nhận được phản hồi.";
+      });
+    });
+  </script>
+</body>
+</html>
