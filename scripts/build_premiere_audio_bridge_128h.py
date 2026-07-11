@@ -10,6 +10,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+try:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
+
 AUDIO_EXTS = {".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg", ".aiff", ".aif"}
 
 
@@ -230,7 +239,7 @@ def main() -> None:
             "details": result_128e,
         }
         write_json(report_dir / "FINAL_128H_REPORT.json", result)
-        print(json.dumps(result, ensure_ascii=False, indent=2))
+        print(json.dumps(result, ensure_ascii=True, indent=2))
         return
 
     source_xml = project / "stt_128e_VIDEO_ONLY_BAD_SOURCE_REPLACED.xml"
@@ -244,7 +253,7 @@ def main() -> None:
             "details": result_128e,
         }
         write_json(report_dir / "FINAL_128H_REPORT.json", result)
-        print(json.dumps(result, ensure_ascii=False, indent=2))
+        print(json.dumps(result, ensure_ascii=True, indent=2))
         return
 
     shutil.copy2(source_xml, final_xml)
@@ -263,7 +272,7 @@ def main() -> None:
             "candidates": candidates,
         }
         write_json(report_dir / "FINAL_128H_REPORT.json", result)
-        print(json.dumps(result, ensure_ascii=False, indent=2))
+        print(json.dumps(result, ensure_ascii=True, indent=2))
         return
 
     try:
@@ -280,7 +289,7 @@ def main() -> None:
             "fix_hint": "python -m pip install imageio-ffmpeg",
         }
         write_json(report_dir / "FINAL_128H_REPORT.json", result)
-        print(json.dumps(result, ensure_ascii=False, indent=2))
+        print(json.dumps(result, ensure_ascii=True, indent=2))
         return
 
     shutil.copy2(stereo_wav, report_dir / stereo_wav.name)
@@ -306,7 +315,7 @@ def main() -> None:
         "fix": "128h_premiere_audio_bridge",
     }
     write_json(report_dir / "FINAL_128H_REPORT.json", result)
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+    print(json.dumps(result, ensure_ascii=True, indent=2))
 
     if not args.no_open:
         try:
