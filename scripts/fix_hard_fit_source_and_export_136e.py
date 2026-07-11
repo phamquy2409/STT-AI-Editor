@@ -98,19 +98,21 @@ def build_candidate_pool(
 ) -> list[dict[str, Any]]:
     camera_map = read_json(project / "stt_camera_source_map_v1.json")
     output = []
+    seen_paths = set()
 
     for row in camera_map.get("items") or []:
         path = str(row.get("file") or "")
         path_key = norm_path(path)
         name_key = filename_of(row).lower()
 
-        if not path_key or path_key in used_paths:
+        if not path_key or path_key in used_paths or path_key in seen_paths:
             continue
         if name_key in excluded_names:
             continue
         if not Path(path).exists():
             continue
 
+        seen_paths.add(path_key)
         output.append(dict(row))
 
     return output
